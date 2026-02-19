@@ -138,6 +138,14 @@ $is_admin = $chat_id == $chat_id_admin;
 $DEBUG = $DEBUG && $is_admin;  // Only allow debugging for the admin
 $telegram = new Telegram($telegram_token, $chat_id, $DEBUG);
 
+// Notify the user if the script is killed by max_execution_time
+register_shutdown_function(function() use ($telegram) {
+    $error = error_get_last();
+    if ($error && $error['type'] === E_ERROR && strpos($error['message'], 'Maximum execution time') !== false) {
+        $telegram->send_message("⌛️ The request timed out. If you sent a message, use /continue to retry. If you used a command, please try it again.");
+    }
+});
+
 $user_config_manager = new UserConfigManager($chat_id, $username, $name, $lang, $DEBUG);
 if ($is_admin || $global_config_manager->is_allowed_user($username, "general")) {
     if (!$user_config_manager->get_openai_api_key()) {
