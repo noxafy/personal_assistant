@@ -76,7 +76,8 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             "last_session_start" => null,
             "cnt" => 0,
             "mode" => "IFS",
-            "voice_mode" => false
+            "voice_mode" => false,
+            "pending_summary" => "",
         );
         $user_config_manager->save_session("session", $session_info);
     }
@@ -248,10 +249,25 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             if ($command == "/end" && $arg == "skip") {
                 $command = "/endskip";
             }
-            // If there were more than 5 messages (2x system, 2 responses), request a session summary
-            if ($command != "/endskip" && count($chat->messages) > 7) {
-                // make a copy of $chat to not save it permanently for now
-                $chat = json_decode(json_encode($chat, JSON_UNESCAPED_UNICODE));
+            $summary = $session_info->pending_summary ?? "";
+
+            // Build the summary prompt (needed for both fresh generation and resume context)
+            if ($user_config_manager->get_lang() == "de") {
+                $summary_prompt = "Zeit zum Reflektieren. Schreibe eine Zusammenfassung dieser Sitzung, die später verwendet wird, um das "
+                ."Profil zu aktualisieren. Fasse daher nur Informationen zusammen, die für zukünftige Sitzungen wirklich notwendig sind."
+                ." Falls du keine Zusammenfassung schreiben möchtest, antworte mit NOSUMMARY.";
+            } else {
+                $summary_prompt = "Time to reflect. Write a summary of this session that will be used later to update the "
+                ."profile. Hence, include only information that is really necessary for upcoming sessions."
+                ." If you don't want to write a summary, answer with NOSUMMARY.";
+            }
+
+            if ($command == "/endskip") {
+                // skip summary + profile update, just end session
+                $summary = "";
+            } else if ($summary == "" && count($chat->messages) > 7) {
+                // Generate a new summary
+                $llm_chat = json_decode(json_encode($chat, JSON_UNESCAPED_UNICODE));
                 if ($user_config_manager->get_lang() == "de") {
                     $telegram->send_message("Bitte gib mir einen Moment, um über unsere Sitzung zu reflektieren...");
                 } else {
@@ -259,20 +275,8 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 }
                 $user_config_manager->save_backup();
 
-                // Session summary
-                if ($user_config_manager->get_lang() == "de") {
-                    $summary_prompt = "Zeit zum Reflektieren. Schreibe eine Zusammenfassung dieser Sitzung, die später verwendet wird, um das "
-                    ."Profil zu aktualisieren. Fasse daher nur Informationen zusammen, die für zukünftige Sitzungen wirklich notwendig sind."
-                    ." Falls du keine Zusammenfassung schreiben möchtest, antworte mit NOSUMMARY.";
-                } else {
-                    $summary_prompt = "Time to reflect. Write a summary of this session that will be used later to update the "
-                    ."profile. Hence, include only information that is really necessary for upcoming sessions."
-                    ." If you don't want to write a summary, answer with NOSUMMARY.";
-                }
-                $chat->messages = array_merge($chat->messages, array(
-                    array("role" => "system", "content" => $summary_prompt)
-                ));
-                $summary = $llm->message($chat);
+                $llm_chat->messages[] = array("role" => "system", "content" => $summary_prompt);
+                $summary = $llm->message($llm_chat);
                 if (has_error($summary)) {
                     if ($user_config_manager->get_lang() == "de") {
                         $telegram->send_message("Entschuldigung, ich habe Probleme, mich mit dem Server zu verbinden. Bitte versuche es erneut /end.");
@@ -282,68 +286,88 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     exit;
                 }
 
-                if ($summary != "NOSUMMARY") {
+                if ($summary == "NOSUMMARY") {
+                    $summary = "";
+                } else {
                     // Show the summary to the user
                     if ($user_config_manager->get_lang() == "de") {
                         $telegram->send_message("Hier ist eine Zusammenfassung unserer Sitzung:\n\n$summary");
                     } else {
                         $telegram->send_message("Here is a summary of our session:\n\n$summary");
                     }
-
-                    // Profile update
-                    if ($session_info->profile == "") {
-                        $new_profile = $summary;
-                    } else {
-                        $time_passed = time_diff($session_info->this_session_start, $session_info->last_session_start);
-
-                        if ($user_config_manager->get_lang() == "de") {
-                            $profile_update_prompt = "Danke für die Zusammenfassung. Lass uns jetzt das Profil mit den neuen Informationen aktualisieren, die du "
-                            ."in dieser Sitzung erhalten hast. Hier ist noch einmal das Profil, das du nach unserer vorherigen Sitzung geschrieben hast ($time_passed her):\n\n"
-                            .$session_info->profile."\n\nDas Ziel ist es, eine detaillierte Beschreibung von mir zu haben, die für alles, was in der nächsten Sitzung ansteht, nützlich ist. "
-                            ."Um ein ausführliches, umfassendes Profil nach vielen Sitzungen zu haben, vermeide es, relevante Informationen aus früheren Sitzungen zu entfernen, sondern "
-                            ."integriere sie in ein detailliertes und informatives Gesamtbild. "
-                            ."Falls du das Profil nicht updaten möchtest, antworte mit NOUPDATE.";
-                        } else {
-                            $profile_update_prompt = "Thank you for the summary. Now, let's update the profile with the new information you got "
-                            ."in this session. Here is again the profile you wrote after our previous session ($time_passed ago):\n\n"
-                            .$session_info->profile."\n\nThe goal is to have a detailed description of me that is useful for whatever comes up in the next session. "
-                            ."To have an elaborate, all-encompassing profile after many sessions, avoid removing relevant information from previous sessions, but "
-                            ."integrate them into a detailed and informative bigger picture. "
-                            ."If you don't want to update the profile, answer with NOUPDATE.";
-                        }
-                        $chat->messages = array_merge($chat->messages, array(
-                            array("role" => "assistant", "content" => $summary),
-                            array("role" => "system", "content" => $profile_update_prompt)
-                        ));
-                        $new_profile = $llm->message($chat);
-                        if (has_error($new_profile)) {
-                            if ($user_config_manager->get_lang() == "de") {
-                                $telegram->send_message("Entschuldigung, ich habe Probleme, mich mit dem Server zu verbinden. Bitte versuche es erneut /end.");
-                            } else {
-                                $telegram->send_message("Sorry, I am having trouble connecting to the server. Please try again /end.");
-                            }
-                            exit;
-                        }
-                    }
-                    // Update the session info
-                    if ($new_profile == "NOUPDATE") {
-                        if ($user_config_manager->get_lang() == "de") {
-                            $telegram->send_message("Das Profil wurde nicht aktualisiert.");
-                        } else {
-                            $telegram->send_message("The profile has not been updated.");
-                        }
-                    } else {
-                        $session_info->profile = $new_profile;
-                    }
-                    $user_config_manager->save_config($chat);
-                    $session_info->last_session_start = $session_info->this_session_start;
-                    $session_info->cnt++;
+                    // Save summary so it survives a max_execution_time kill (via __destruct)
+                    $session_info->pending_summary = $summary;
                 }
             }
+
+            // Profile update (only if we have a summary, whether fresh or pending)
+            if ($summary != "") {
+                if (!isset($llm_chat)) {
+                    // Resuming from a previously interrupted /end
+                    if ($user_config_manager->get_lang() == "de") {
+                        $telegram->send_message("Bitte gib mir einen Moment, um dein Profil zu aktualisieren...");
+                    } else {
+                        $telegram->send_message("Please give me a moment to update your profile...");
+                    }
+                }
+                if ($session_info->profile == "") {
+                    $new_profile = $summary;
+                } else {
+                    // Build LLM context: session messages + summary prompt + summary + profile update prompt
+                    if (!isset($llm_chat)) {
+                        $llm_chat = json_decode(json_encode($chat, JSON_UNESCAPED_UNICODE));
+                        $llm_chat->messages[] = array("role" => "system", "content" => $summary_prompt);
+                    }
+                    $time_passed = time_diff($session_info->this_session_start, $session_info->last_session_start);
+
+                    if ($user_config_manager->get_lang() == "de") {
+                        $profile_update_prompt = "Danke für die Zusammenfassung. Lass uns jetzt das Profil mit den neuen Informationen aktualisieren, die du "
+                        ."in dieser Sitzung erhalten hast. Hier ist noch einmal das Profil, das du nach unserer vorherigen Sitzung geschrieben hast ($time_passed her):\n\n"
+                        .$session_info->profile."\n\nDas Ziel ist es, eine detaillierte Beschreibung von mir zu haben, die für alles, was in der nächsten Sitzung ansteht, nützlich ist. "
+                        ."Um ein ausführliches, umfassendes Profil nach vielen Sitzungen zu haben, vermeide es, relevante Informationen aus früheren Sitzungen zu entfernen, sondern "
+                        ."integriere sie in ein detailliertes und informatives Gesamtbild. "
+                        ."Falls du das Profil nicht updaten möchtest, antworte mit NOUPDATE.";
+                    } else {
+                        $profile_update_prompt = "Thank you for the summary. Now, let's update the profile with the new information you got "
+                        ."in this session. Here is again the profile you wrote after our previous session ($time_passed ago):\n\n"
+                        .$session_info->profile."\n\nThe goal is to have a detailed description of me that is useful for whatever comes up in the next session. "
+                        ."To have an elaborate, all-encompassing profile after many sessions, avoid removing relevant information from previous sessions, but "
+                        ."integrate them into a detailed and informative bigger picture. "
+                        ."If you don't want to update the profile, answer with NOUPDATE.";
+                    }
+                    $llm_chat->messages = array_merge($llm_chat->messages, array(
+                        array("role" => "assistant", "content" => $summary),
+                        array("role" => "system", "content" => $profile_update_prompt)
+                    ));
+                    $new_profile = $llm->message($llm_chat);
+                    if (has_error($new_profile)) {
+                        if ($user_config_manager->get_lang() == "de") {
+                            $telegram->send_message("Entschuldigung, ich habe Probleme, mich mit dem Server zu verbinden. Bitte versuche es erneut /end.");
+                        } else {
+                            $telegram->send_message("Sorry, I am having trouble connecting to the server. Please try again /end.");
+                        }
+                        exit;
+                    }
+                }
+                // Update the session info
+                if ($new_profile == "NOUPDATE") {
+                    if ($user_config_manager->get_lang() == "de") {
+                        $telegram->send_message("Das Profil wurde nicht aktualisiert.");
+                    } else {
+                        $telegram->send_message("The profile has not been updated.");
+                    }
+                } else {
+                    $session_info->profile = $new_profile;
+                }
+                $session_info->last_session_start = $session_info->this_session_start;
+                $session_info->cnt++;
+            }
+
             // Clear the chat history and end the session
             $chat->messages = array();
             $session_info->running = false;
             $session_info->this_session_start = null;
+            $session_info->pending_summary = "";
 
             // Save the chat history and the new profile
             $user_config_manager->save_config($chat);
