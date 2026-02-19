@@ -443,6 +443,8 @@ class Telegram {
                 }
                 // Replace an "* " at the start of the line with "- "
                 $line = preg_replace('/^\* /', '- ', $line);
+                // Strip space after > blockquote marker (Telegram counts it as part of the quote)
+                $line = preg_replace('/^> /', '>', $line);
                 // Replace all ** outside of code blocks by *
                 $line = preg_replace('/(?<!`)\*\*(.*?)(?<!`)\*\*/', '*$1*', $line);
                 // Strip asterisks around heading text itself
