@@ -444,7 +444,6 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             "/claude46sonnet" => "claude-sonnet-4-6",
             "/claude45sonnet" => "claude-sonnet-4-5",
             "/claude4sonnet" => "claude-sonnet-4-0",
-            "/claude37sonnet" => "claude-3-7-sonnet-latest",
             "/gpt52" => "gpt-5.2-2025-12-11-medium",
             "/gpt41" => "gpt-4.1",
             "/mistrallarge3" => "mistralai/mistral-large-2512"
