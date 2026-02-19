@@ -218,7 +218,12 @@ function parse_link($link) {
     $ch = curl_init($link);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Follow redirects
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; PersonalAssistantBot/1.0)');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language: en-US,en;q=0.9',
+        'Accept-Encoding: identity', // Request uncompressed responses to avoid unsupported encodings (e.g. Brotli)
+    ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $html = curl_exec($ch);
 
@@ -228,11 +233,17 @@ function parse_link($link) {
     }
 
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $final_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
     curl_close($ch);
 
     // Check for HTTP errors
     if ($http_code >= 400) {
-        return "Error: HTTP error $http_code when fetching URL";
+        return "Error: HTTP error $http_code when fetching URL" . ($final_url !== $link ? " (redirected to $final_url)" : "");
+    }
+
+    $html_length = strlen($html);
+    if ($html_length === 0) {
+        return "Error: Empty response from server (HTTP $http_code)";
     }
 
     if (!class_exists('\\fivefilters\\Readability\\Readability')) {
@@ -268,7 +279,9 @@ function parse_link($link) {
 
         $result = trim($result);
     } catch (\Exception $e) {
-        return "Error: Could not parse link content: " . $e->getMessage();
+        return "Error: Could not parse link content: " . $e->getMessage()
+            . " (HTTP $http_code, response length: $html_length bytes"
+            . ($final_url !== $link ? ", redirected to $final_url" : "") . ")";
     }
     return $result;
 }
