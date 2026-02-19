@@ -387,19 +387,11 @@ class Telegram {
             $start = $end;
         }
 
-        // For each $$ find the corresponding $$ (might be on later lines) and replace both by ```
-        $start = 0;
-        while (($start < strlen($response) && $start = strpos($response, "\$\$", $start)) !== false) {
-            $end = strpos($response, "\$\$", $start+2);
-            if ($end === false) {
-                $end = strlen($response);
-            }
-            $latex = substr($response, $start, $end - $start + 2);
-            $latex_new = substr($latex, 2, strlen($latex)-4);
-            $latex_new = trim($latex_new);
-            $response = str_replace($latex, "```\n$latex_new\n```", $response);
-            $start = $end;
-        }
+        // For each $$ on its own line, find the corresponding $$ and replace both by ```
+        // Multi-line: $$ on one line, content on next line(s), $$ on another line
+        $response = preg_replace('/^\h*\$\$\h*\n(.*?)\n\h*\$\$\h*$/ms', "```\n$1\n```", $response);
+        // Same line: $$content$$ where it's the only thing on the line
+        $response = preg_replace('/^\h*\$\$(.*?)\$\$\h*$/m', "```\n$1\n```", $response);
         $response = preg_replace('/^\s*```\s*/', '```', $response);
         // Ensure every ``` starts on a new line
         $response = preg_replace('/(?<!\n)```/', "\n```", $response);
@@ -427,7 +419,7 @@ class Telegram {
                 // For each \( find the corresponding \) and replace both by `
                 $line = preg_replace('/`?\\\\\( ?(.*?) ?\\\\\)`?/', '`$1`', $line);
                 // Same for $ and $
-                $line = preg_replace('/`?\$ ?(.*?) ?\$`?/', '`$1`', $line);
+                $line = preg_replace('/`?(?<!\$)\$(?!\$)(?![,\.;:!\?)\]]) ?(.*?) ?(?<!\$)\$(?!\$)`?/', '`$1`', $line);
                 // Replace * preceded or followed by a digit or paranthesis (any of )(][ ) by \*
                 // $line = preg_replace('/(?<=[0-9\(\)\[\]])\*(?=[0-9\(\)\[\]])/', '\\*', $line);
 
