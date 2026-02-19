@@ -511,28 +511,12 @@ function markdownV2_escape($line, $j) {
             $rightOdd = ($numIndices - $currentIndex) % 2 == 1;
 
             // If one side has odd count and the other has even
-            if ($leftOdd xor $rightOdd) {
-                // Special case for tilde
-                if ($char == '~') {
-                    // If ~ is followed by (space+)digit AND neighboring ~ is preceded by space, escape it
-                    if (!preg_match('/^\s?\d/', substr($line, $j + 1))) {
-                        return False;
-                    }
+            // If ~ is used as "approximately" (followed by optional space, optional currency symbol, digit), always escape it
+            if ($char == '~' && preg_match('/^\s?\p{Sc}?\d/u', substr($line, $j + 1))) {
+                return True;
+            }
 
-                    // Check if any neighboring ~ is preceded by space
-                    if ($currentIndex > 0) {
-                        $prevTildePos = $matches[0][$currentIndex - 1][1];
-                        if ($prevTildePos > 0 && preg_match('/\s/', $line[$prevTildePos - 1])) {
-                            return True;
-                        }
-                    }
-                    if ($currentIndex < $numIndices) {
-                        $nextTildePos = $matches[0][$currentIndex + 1][1];
-                        if ($nextTildePos > 0 && preg_match('/\s/', $line[$nextTildePos - 1])) {
-                            return True;
-                        }
-                    }
-                }
+            if ($leftOdd xor $rightOdd) {
                 return False;
             }
 
