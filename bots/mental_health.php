@@ -622,13 +622,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         }, "Settings", "Set your own OpenAI Router API key");
 
         // The command /c allows to request another response from the model
-        $command_manager->add_command(array("/c"), function($command, $_) use ($telegram, $user_config_manager, $DEBUG) {
+        $command_manager->add_command(array("/continue", "/c"), function($command, $_) use ($telegram, $user_config_manager, $DEBUG) {
             // Check if session is running
             $session_info = $user_config_manager->get_session("session");
-            if ($session_info->running == false) {
-                $telegram->send_message("Please start a new session with /start first.");
-                exit;
-            }
+            $session_info->running || $telegram->die("Please start a new session with /start first.");
         }, "Misc", "Request another response from the model");
 
         if (!$is_admin) {
@@ -855,6 +852,30 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 $telegram->send_message($message);
                 exit;
             }, "Admin", "Print the usage statistics of all users for a given month (default: current month)");
+
+            // The command /user adds a user message to the chat history
+            $command_manager->add_command(array("/user", "/u"), function($command, $message) use ($telegram, $user_config_manager) {
+                $message != "" || $telegram->die("Please provide a message to add.");
+                $user_config_manager->add_message("user", $message);
+                $telegram->send_message("Added user message to chat history.");
+                exit;
+            }, "Chat history management", "Add a message with \"user\" role to the internal chat history");
+
+            // The command /assistant adds an assistant message to the chat history
+            $command_manager->add_command(array("/assistant", "/a"), function($command, $message) use ($telegram, $user_config_manager) {
+                $message != "" || $telegram->die("Please provide a message to add.");
+                $user_config_manager->add_message("assistant", $message);
+                $telegram->send_message("Added assistant message to chat history.");
+                exit;
+            }, "Chat history management", "Add a message with \"assistant\" role to the internal chat history");
+
+            // The command /system adds a system message to the chat history
+            $command_manager->add_command(array("/system", "/s"), function($command, $message) use ($telegram, $user_config_manager) {
+                $message != "" || $telegram->die("Please provide a message to add.");
+                $user_config_manager->add_message("system", $message);
+                $telegram->send_message("Added system message to chat history.");
+                exit;
+            }, "Chat history management", "Add a message with \"system\" role to the internal chat history");
         }
 
         $response = $command_manager->run_command($message);
