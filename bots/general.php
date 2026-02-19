@@ -46,7 +46,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             }
             $user_config_manager->add_message("user", $message);
             exit;
-        } else if (preg_match('/^\s*(https?:\/\/[^\s]+)\s*(.*)$/i', $message, $matches) && !preg_match('/\.(jpg|jpeg|png)$/i', $matches[1])) {
+        } else if (preg_match('/^\s*(https?:\/\/[^\s]+)\s*(.*)$/is', $message, $matches) && !preg_match('/\.(jpg|jpeg|png)$/i', $matches[1])) {
             $link = $matches[1];
             $user_message = trim($matches[2] ?? '');
 
