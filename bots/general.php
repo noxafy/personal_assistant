@@ -270,16 +270,19 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
         // Shortcuts for models
         $shortcuts_medium = array(
+            "/claude46sonnet" => "claude-sonnet-4-6",
+            "/claude46sonnetthinking" => "claude-sonnet-4-6-thinking",
             "/claude45sonnet" => "claude-sonnet-4-5",
-            "/claude4sonnet" => "claude-sonnet-4-20250514",
-            "/claude4sonnetthinking" => "claude-sonnet-4-20250514-thinking",
-            "/gpt41" => "gpt-4.1",
+            "/claude45sonnetthinking" => "claude-sonnet-4-5-thinking",
+            "/claude4sonnet" => "claude-sonnet-4-0",
+            "/claude4sonnetthinking" => "claude-sonnet-4-0-thinking",
             "/claude37sonnet" => "claude-3-7-sonnet-latest",
             "/claude37sonnetthinking" => "claude-3-7-sonnet-latest-thinking",
             "/claude35sonnet" => "claude-3-5-sonnet-20240620",
             "/gpt52" => "gpt-5.2-2025-12-11-medium",
             "/gpt51" => "gpt-5.1-2025-11-13-medium",
             "/gpt5" => "gpt-5-medium",
+            "/gpt41" => "gpt-4.1",
             "/o4mini" => "o4-mini-high",  // o4-mini default: "high"
             "/o4minilow" => "o4-mini-low",
             "/o4minimedium" => "o4-mini-medium",
@@ -294,27 +297,37 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             "/mistrallarge3" => "mistralai/mistral-large-2512",
             "/mistrallarge2" => "mistralai/mistral-large-2411",  # 123b
             "/gpt4o" => "gpt-4o",
-            "/qwen3" => "qwen/qwen3-235b-a22b-2507",  # 235b
-            "/glm45" => "z-ai/glm-4.5",  # 355b
+            "/qwen35plus" => "qwen/qwen3.5-plus-02-15",
+            "/qwen35" => "qwen/qwen3.5-397b-a17b",  # 397b
+            "/qwen3vl" => "qwen/qwen3-vl-235b-a22b-instruct",  # 235b
+            "/qwen25" => "qwen/qwen2.5-vl-72b-instruct",  # 72b
+            "/glm5" => "z-ai/glm-5",  # 745b
+            "/glm47" => "z-ai/glm-4.7",  # 355b
             "/llama4scout" => "meta-llama/llama-4-scout",  # 109b
-            "/qwen25" => "qwen/qwen2.5-vl-72b-instruct"  # 72b
+            "/minimaxm25" => "minimax/minimax-m2.5",
             // "/bloom" => "bigscience/bloom"
         );
 
         $shortcuts_large = array(
+            "/claude46opus" => "claude-opus-4-6",  # ?
+            "/claude46opusthinking" => "claude-opus-4-6-thinking",  # ?
             "/claude45opus" => "claude-opus-4-5",  # ?
             "/claude45opusthinking" => "claude-opus-4-5-thinking",  # 2T ?
-            "/claude4opus" => "claude-opus-4-0",  # 2T ?
             "/claude41opus" => "claude-opus-4-1",  # 2T ?
             "/claude41opusthinking" => "claude-opus-4-1-thinking",
+            "/claude4opus" => "claude-opus-4-0",  # 2T ?
             // "/o3pro" => "o3-pro",  # 1T
+            "/gemini3pro" => "google/gemini-3-pro-preview",
             "/gemini25pro" => "google/gemini-2.5-pro",  # 300-700b range
-            "/depseekr1" => "deepseek/deepseek-r1-0528",  # 671b
+            "/deepseekr1" => "deepseek/deepseek-r1-0528",  # 671b
             "/deepseekv32" => "deepseek/deepseek-v3.2",  #
             "/deepseekv3" => "deepseek/deepseek-chat-v3-0324",  # 671b
             "/llama4maverick" => "meta-llama/llama-4-maverick",  # 400b
+            "/llama31" => "meta-llama/llama-3.1-405b-instruct",
+            "/llama31base" => "meta-llama/llama-3.1-405b",
+            "/kimik25" => "moonshotai/kimi-k2.5", # 1T
             "/kimik2" => "moonshotai/kimi-k2",  # 1T
-            "/gpt45" => "gpt-4.5-preview",  # 2T ?
+            // "/gpt45" => "gpt-4.5-preview",  # 2T ?
         );
 
         $shortcuts_small = array(
@@ -324,9 +337,12 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             "/gpt41nano" => "gpt-4.1-nano",
             "/gpt5nano" => "gpt-5-nano-medium",
             "/mistralsmall32" => "mistralai/mistral-small-3.2-24b-instruct",
+            "/geminiflash3" => "google/gemini-3-flash-preview",
             "/geminiflash25" => "google/gemini-2.5-flash",  # 5b
             "/geminiflash20" => "google/gemini-2.0-flash-001",  # 20b
-            "/mercury" => "inception/mercury"
+            "/mercury" => "inception/mercury",
+            "/mistralsmallcreative" => "mistralai/mistral-small-creative",  # 24b
+            "/step35flash" => "stepfun/step-3.5-flash"  # 196b
         );
 
         // #########################

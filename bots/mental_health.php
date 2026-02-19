@@ -438,12 +438,16 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
         // Shortcuts for models
         $shortcuts_large = array(
-            "/claude4sonnet" => "claude-sonnet-4-20250514",
+            "/claude46opus" => "claude-opus-4-6",
+            "/claude45opus" => "claude-opus-4-5",
+            "/claude4opus" => "claude-opus-4",
+            "/claude46sonnet" => "claude-sonnet-4-6",
+            "/claude45sonnet" => "claude-sonnet-4-5",
+            "/claude4sonnet" => "claude-sonnet-4-0",
             "/claude37sonnet" => "claude-3-7-sonnet-latest",
+            "/gpt52" => "gpt-5.2-2025-12-11-medium",
             "/gpt41" => "gpt-4.1",
-            "/gpt41mini" => "gpt-4.1-mini",
-            "/o4mini" => "o4-mini",
-            "/gpt4o" => "gpt-4o",
+            "/mistrallarge3" => "mistralai/mistral-large-2512"
         );
 
         // The command /model shows the current model and allows to change it

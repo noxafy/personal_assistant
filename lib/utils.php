@@ -147,8 +147,8 @@ function get_usage_string($user, $month, $show_info) {
     if ($cnt_prompt == 0 && $cnt_completion == 0)
         return "no data";
 
-    $input_cost = 3;
-    $output_cost = 15;
+    $input_cost = 5;
+    $output_cost = 25;
     $price_estimate = round($cnt_prompt / 1000000 * $input_cost + $cnt_completion / 1000000 * $output_cost, 2);
     $message .= "$cnt_prompt + $cnt_completion tokens (~".$price_estimate."€)";
     if ($show_info) {
