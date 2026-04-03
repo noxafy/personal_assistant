@@ -47,6 +47,9 @@ class LLMConnector {
      */
     public function message($data, $enable_websearch = false): string|array {
         $data = json_decode(json_encode($data, JSON_UNESCAPED_UNICODE), false);  // copy data do not modify the original object
+        if (!isset($data->max_tokens)) {
+            $data->max_tokens = 2048;
+        }
 
         // If not using Claude, convert any structured array content in messages to text
         if (!str_starts_with($data->model, "claude-")) {

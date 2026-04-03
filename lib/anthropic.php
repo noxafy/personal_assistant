@@ -64,9 +64,6 @@ class Anthropic {
         //         {"role": "user", "content": "Hello, world"}
         //     ]
         // }'
-        if (!isset($data->max_tokens)) {
-            $data->max_tokens = 4096;
-        }
         if (isset($data->thinking->budget_tokens)) {
             $data->max_tokens += $data->thinking->budget_tokens;
         }
