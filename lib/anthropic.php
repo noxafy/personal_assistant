@@ -100,6 +100,11 @@ class Anthropic {
             ));
             return "Error: The response from Anthropic is not in the expected format: ".json_encode($response, JSON_UNESCAPED_UNICODE);
         }
+        // if ($this->DEBUG) {
+        //     $month = date("ym");
+        //     return $response->content[0]->text."\n\n"."Input: ".$response->usage->input_tokens." tokens\nOutput: ".$response->usage->output_tokens." tokens"
+        //     ."\nMonth out: ".$this->user->get_counters()->anthropic_2602_chat_output_tokens."\nMonth in: ".$this->user->get_counters()->anthropic_2602_chat_input_tokens;
+        // }
         return $response->content;
     }
 

@@ -1901,6 +1901,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 }
 
                 // Generate a response with swapped roles
+                // $telegram->send_message("DEBUG: Last message in temp_chat has role \"".end($temp_chat->messages)->role."\": ".mb_substr(end($temp_chat->messages)->content, 0, 40)."...");
                 $user_response = $llm->message($temp_chat);
                 $telegram->die_if_error($user_response, $user_config_manager);
                 $user_config_manager->add_message("user", $user_response);
