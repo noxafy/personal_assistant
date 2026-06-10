@@ -1048,7 +1048,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
         // The command /papersupdate fetches and summarizes recent papers relevant to a given topic
         $command_manager->add_command(array("/papersupdate"), function($command, $args) use ($telegram, $user_config_manager, $llm, $shortcuts_large, $shortcuts_medium) {
-            $args = explode(" ", $args, 4);
+            $args = explode(" ", $args, 3);
             $today = new DateTime();
             $dt = DateTime::createFromFormat('Y-m-d', $args[0]);
             if ($dt) array_shift($args);
