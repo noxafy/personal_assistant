@@ -862,10 +862,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             if ($n_messages > 1 && $info != "") {
                 $source_str .= "the previous conversation and further information by the user given below";
             }
-            elseif ($n_messages > 1) {
+            else if ($n_messages > 1) {
                 $source_str .= "the previous conversation";
             }
-            elseif ($info != "") {
+            else if ($info != "") {
                 $source_str .= "the information by the user given below";
             }
             // Prompt the model to write a todo list
@@ -922,9 +922,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
             // Prompt the model to generate a search query
             $prompt = "Your task is to create an optimized search query based on the previous conversation";
-            if ($query != "") {
-                $prompt .= " and the following additional context: \"$query\"";
-            }
+            $query === "" || $prompt .= " and the following additional context: \"$query\"";
             $prompt .= ". Focus on extracting the key information needs and formulating a clear, specific query. "
                     ."If the conversation covered multiple topics, focus on the last topic discussed. "
                     ."Your query should be well-structured for AI search and research tools like Perplexity AI and Elicit. "
@@ -971,9 +969,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             if (count($config->messages) > 2) {
                 $context_prompt = "Based on the conversation history";
                 // If query is provided, use it as additional context, otherwise use chat history only
-                if ($query !== "") {
-                    $context_prompt .= " and considering this additional context: \"$query\"";
-                }
+                $query === "" || $context_prompt .= " and considering this additional context: \"$query\"";
                 $context_prompt .= ", create an optimized search query for the Semantic Scholar API by following these guidelines:\n".
                                   "\n1. Extract exactly 2-4 key concepts that represent the core research question\n".
                                   "2. Use natural language phrasing to allow for terminology variations\n".
@@ -1058,16 +1054,13 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             if ($dt) array_shift($args);
             else $dt = $today;
             $date = $dt->format('Y-m-d');
-            if ($dt > $today) {
-                $telegram->die("The date provided \"$date\" is in the future. Please provide a date that is in the past.");
-            }
+            $dt <= $today || $telegram->die("The date provided \"$date\" is in the future. Please provide a date that is in the past.");
             $days = $args[0] ?: 7;
             $args[1] ?? $telegram->die("Please provide a category.");
             $category = $args[1];
             $topic = $args[2] ?? "general";
-            if (!ctype_digit((string)$days) || (int)$days <= 0) {
+            if (!ctype_digit((string)$days) || (int)$days <= 0)
                 $telegram->die("Please provide a positive integer for the number of days.");
-            }
             $days = (int)$days;
             // 1. Fetch latest papers from SciRate
             $max_pages = 20;
@@ -1203,9 +1196,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
             // Create a summary request to the AI
             $summary_request = "Please provide a concise summary of the conversation so far. Include key points, decisions, and important information that was discussed. Format the summary to be clear and well-organized.";
-            if (!empty($prompt)) {
-                $summary_request .= " Focus especially on: $prompt";
-            }
+            empty($prompt) || $summary_request .= " Focus especially on: $prompt";
             $user_config_manager->add_message("user", $summary_request);
             $summary_response = $llm->message($chat);
             $telegram->die_if_error($summary_response, $user_config_manager);
@@ -1575,9 +1566,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         $command_manager->add_command(array("/remove_appendix"), function($command, $query) use ($telegram, $user_config_manager) {
             $config = $user_config_manager->get_config();
             $messages = $config->messages;
-            if (empty($messages)) {
-                $telegram->die("No previous messages found.");
-            }
+            empty($messages) && $telegram->die("No previous messages found.");
             // Only allow if the last message is an arXiv extraction message
             $last_msg = end($messages)->content;
             if (!is_string($last_msg) || !preg_match('/^arXiv:\d{4}\.\d{4,5}/s', $last_msg)) {
@@ -1770,15 +1759,13 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         // The command /dumpmessages outputs the messages in a form that could be used to recreate the chat history
         $command_manager->add_command(array("/dm", "/dmf"), function($command, $n) use ($telegram, $user_config_manager) {
             $messages = $user_config_manager->get_config()->messages;
-            // Check if there are messages
-            count($messages) > 0 || $telegram->die("There are no messages to dump.");
-            // If a number is provided, only dump the last n messages
-            if ($n != "") {
-                is_numeric($n) || $telegram->die("Please provide a number of messages to dump.");
-                $n = intval($n);
-                $n > 0 || $telegram->die("Please provide a positive number of messages to dump.");
-                $messages = array_slice($messages, -$n);
-            }
+            $n_total = count($messages);
+            $n_total > 0 || $telegram->die("There are no messages to dump.");
+            $n = $n ?: 1;
+            is_numeric($n) || $telegram->die("Please provide a number.");
+            $n = intval($n);
+            $n > 0 || $telegram->die("Please provide a positive number.");
+            $messages = array_slice($messages, -$n);
             // Send each message as a separate message
             foreach ($messages as $message) {
                 if (is_string($message->content)) {
