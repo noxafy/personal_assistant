@@ -21,11 +21,24 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         $message = $update->text;
 
         // Only process as arXiv if the message starts with a valid arXiv link or ID
-        if (preg_match('/^\s*((?:https?:\/\/)?arxiv\.org\/(?:abs|pdf)\/(\d+\.\d+(?:v\d+)?)(?:\.pdf)?\/?|arxiv:(\d+\.\d+(?:v\d+)?)(?=\s|$))\s*(.*)$/i',
-                        $message, $matches)) {
-            // Find the arXiv ID from the capturing groups
-            $arxiv_id = $matches[2] ?: $matches[3];
-            $user_message = trim($matches[4] ?? '');
+        // $pattern = '/
+        //     ^\s*                                           # start of string + optional whitespace
+        //     (?:                                            # optional prefix (one of, or none)
+        //         (?:https?:\/\/)?arxiv\.org\/(?:abs|pdf)\/  # arxiv URL (/abs/ or /pdf/)
+        //         | (?:doi[.:])?10\.48550\/arxiv\.           # DOI (with or without "doi:" prefix)
+        //         | arxiv.?                                  # bare "arXiv:" or "arXiv-"
+        //     )?                                             # prefix is optional (bare ID allowed)
+        //     (
+        //         \d{4}\.\d{4,5}(?:v\d+)?                    # modern: YYYY.NNNN[vN]
+        //         | [a-z][a-z0-9.\-]*\/\d{4}\d+(?:v\d+)? # legacy: category/YYMMNNN[vN]
+        //     )
+        //     (?:\.pdf)?                                     # trailing .pdf (only relevant for pdf URLs)
+        //     (?!\d)                                         # boundary: not further digit
+        // /ix';                                             // i = ignore case; x = allow comments
+        if (preg_match('/^\s*(?:(?:https?:\/\/)?arxiv\.org\/(?:abs|pdf)\/|(?:doi[.:]\s*)?10\.48550\/arxiv\.|arxiv.?)?(\d{4}\.\d{4,5}(?:v\d+)?|[a-z][a-z0-9.\-]*\/\d{4}\d+(?:v\d+)?)(?:\.pdf)?(.*)$/is',
+                $message, $matches)) {
+            $arxiv_id = $matches[1];
+            $user_message = trim($matches[2] ?? '');
 
             $telegram->send_message("Detected arXiv ID `$arxiv_id`. Processing...");
 
