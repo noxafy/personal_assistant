@@ -139,24 +139,40 @@ function get_arxiv_source($arxiv_id) {
     }
 
     // Extract the archive
-    $output = [];
-    $return_var = 0;
-    exec("tar -xzf $temp_file -C $temp_dir", $output, $return_var);
-    if ($return_var !== 0) {
-        // Try alternate file formats
-        exec("tar -xf $temp_file -C $temp_dir", $output, $return_var);
-        if ($return_var !== 0) {
+    try {
+        // usually .tar.gz
+        $phar = new PharData($temp_file);
+        $phar->extractTo($temp_dir);
+    } catch (\Exception $e) {
+        // try pure .gz (gzip)
+        $content = file_get_contents("compress.zlib://$temp_file");
+        if ($content === false) {
             array_map('unlink', glob("$temp_dir/*"));
             rmdir($temp_dir);
             return "Error: Failed to extract arXiv source archive.";
         }
+        file_put_contents("$temp_dir/source.tex", $content);
     }
+    unlink($temp_file);
 
     // Find main TeX file
     $tex_files = glob("$temp_dir/*.tex");
     if (empty($tex_files)) {
-        // Look in subdirectories
-        $tex_files = glob("$temp_dir/*/*.tex");
+        // Check if there is only a single file without extension
+        $files_no_ext = glob("$temp_dir/*");
+        $files_no_ext = array_filter($files_no_ext, function($f) {
+            return is_file($f) && !preg_match('/\.[^\/\\]+$/', $f); // no extension
+        });
+        if (count($files_no_ext) === 1) {
+            $single_file = $files_no_ext[0];
+            $new_name = $single_file . '.tex';
+            if (rename($single_file, $new_name)) {
+                $tex_files = [$new_name];
+            }
+        } else {
+            // Look in subdirectories
+            $tex_files = glob("$temp_dir/*/*.tex");
+        }
         if (empty($tex_files)) {
             array_map('unlink', glob("$temp_dir/*"));
             rmdir($temp_dir);
@@ -165,15 +181,22 @@ function get_arxiv_source($arxiv_id) {
     }
 
     // Prioritize files that might be the main file
+    // Move files with 'template' in the name to the end of the array
+    usort($tex_files, function($a, $b) {
+        $a_has_template = stripos(basename($a), 'template') !== false;
+        $b_has_template = stripos(basename($b), 'template') !== false;
+        if ($a_has_template === $b_has_template) return 0;
+        return $a_has_template ? 1 : -1;
+    });
     $main_file = $tex_files[0];  // If no main file found, use the first one
-    foreach ($tex_files as $file) {
-        $content = file_get_contents($file);
-        if (strpos($content, '\documentclass') !== false ||
-            strpos($content, '\begin{document}') !== false) {
-            $main_file = $file;
-            break;
-        }
-    }
+    // foreach ($tex_files as $file) {
+    //     $content = file_get_contents($file);
+    //     if (strpos($content, '\documentclass') !== false ||
+    //         strpos($content, '\begin{document}') !== false) {
+    //         $main_file = $file;
+    //         break;
+    //     }
+    // }
     if ($main_file === null) {
         array_map('unlink', glob("$temp_dir/*"));
         rmdir($temp_dir);
