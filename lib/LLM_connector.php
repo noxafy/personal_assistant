@@ -100,13 +100,13 @@ class LLMConnector {
                 unset($data->temperature);
             }
             // Set reasoning effort based on "-*" ending (e.g., "o3-medium")
-            $effort = "high";
-            if (preg_match('/^(.*?)-(low|medium|high)$/', $data->model, $matches)) {
+            $effort = "none";
+            if (preg_match('/^(.*?)-(none|low|minimal|medium|high|xhigh)$/', $data->model, $matches)) {
                 $data->model = $matches[1];
                 $effort = $matches[2];
             }
             $data->reasoning = (object) array(
-                "effort" => $effort  // "low", "medium", "high"
+                "effort" => $effort
             );
             $data->store = false;
         }
@@ -134,7 +134,7 @@ class LLMConnector {
 
         return [
             'content' => $content,
-            'thinking' => $is_reasoning_model ? "OpenAI doesn't provide reasoning output." : ""
+            'thinking' => $is_reasoning_model && $data->reasoning->effort != "none" ? "$is_reasoning_model".$data->reasoning->effort."OpenAI doesn't provide reasoning output." : ""
         ];
     }
 
@@ -301,7 +301,8 @@ class LLMConnector {
     private function parse_openrouter($data): string|array {
         $openrouter = new OpenRouter($this->user, $this->DEBUG);
         $data->reasoning = (object) array(
-            "effort" => "high"
+            // For some models, set effort to 'none'
+            "effort" => array_reduce(["kimi"], fn($carry, $model) => $carry || strpos($data->model, $model) !== false, false) ? "none" : "medium"
         );
         $data->data_collection = "deny";
         $message = $openrouter->message($data);
