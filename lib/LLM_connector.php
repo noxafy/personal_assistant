@@ -238,9 +238,20 @@ class LLMConnector {
      */
     private function parse_openrouter($data): string|array {
         $openrouter = new OpenRouter($this->user, $this->DEBUG);
+        $effort = "none";
+        foreach (["ring", "gemini-3.", "fable"] as $keyword) {
+            if (strpos($data->model, $keyword) !== false) {
+                $effort = "low";
+                break;
+            }
+        }
+        if (preg_match('/^(.*?)-(none|low|minimal|medium|high|xhigh)$/', $data->model, $matches)) {
+            $data->model = $matches[1];
+            $effort = $matches[2];
+        }
         $data->reasoning = (object) array(
             // For some models, set effort to 'none'
-            "effort" => array_reduce(["kimi"], fn($carry, $model) => $carry || strpos($data->model, $model) !== false, false) ? "none" : "medium"
+            "effort" => $effort
         );
         $data->data_collection = "deny";
         if (str_contains($data->model, "claude")) {
