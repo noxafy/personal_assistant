@@ -204,91 +204,8 @@ class LLMConnector {
             }
         }
 
-        // Collect initial system messages
-        $system_message = "";
-        while (count($data->messages) > 0 && $data->messages[0]->role === "system") {
-            if (is_string($data->messages[0]->content)) {
-                if ($system_message !== "") {
-                    $system_message .= "\n\n";
-                }
-                $system_message .= $data->messages[0]->content;
-            }
-            array_splice($data->messages, 0, 1);
-        }
-        if ($system_message !== "") {
-            $data->system = $system_message;
-        }
-
-        // Convert any remaining system messages to user messages with SYSTEM GUIDANCE prefix
-        for ($i = 0; $i < count($data->messages); $i++) {
-            $mes = $data->messages[$i];
-            if ($mes->role === "system") {
-                $mes->role = "user";
-                if (is_string($mes->content)) {
-                    $mes->content = "SYSTEM GUIDANCE: " . $mes->content;
-                }
-                else {
-                    for ($j = 0; $j < count($mes->content); $j++) {
-                        if (isset($mes->content[$j]->text)) {
-                            $mes->content[$j]->text = "SYSTEM GUIDANCE: " . $mes->content[$j]->text;
-                        }
-                    }
-                }
-            }
-        }
-
-        // aggregate directly consecutive messages of the same role
-        for ($i = 0; $i < count($data->messages) - 1; $i++) {
-            if ($data->messages[$i]->role === $data->messages[$i + 1]->role) {
-                // First message: convert string to array with text object
-                if (is_string($data->messages[$i]->content)) {
-                    $data->messages[$i]->content = array((object) array(
-                        "type" => "text",
-                        "text" => $data->messages[$i]->content
-                    ));
-                }
-
-                // Second message: convert string to array with text object
-                if (is_string($data->messages[$i + 1]->content)) {
-                    $data->messages[$i + 1]->content = array((object) array(
-                        "type" => "text",
-                        "text" => $data->messages[$i + 1]->content
-                    ));
-                }
-
-                // Merge the content arrays
-                $data->messages[$i]->content = array_merge($data->messages[$i]->content, $data->messages[$i + 1]->content);
-                array_splice($data->messages, $i + 1, 1);
-                $i--; // Recheck the current index since we removed an element
-            }
-        }
-
-        // set prompt caching for every sixth message
-        $cached = 0;
-        for ($i = 0; $i < count($data->messages); $i++) {
-            if ($i % 6 == 4) {
-                if (is_string($data->messages[$i]->content)) {
-                    $data->messages[$i]->content = array((object) array(
-                        "type" => "text",
-                        "text" => $data->messages[$i]->content,
-                        "cache_control" => (object) array("type" => "ephemeral")
-                    ));
-                    $cached++;
-                }
-                // images
-                else if (isset($data->messages[$i]->content[0]->type)) {
-                    $data->messages[$i]->content[0]->cache_control = (object) array("type" => "ephemeral");
-                    $cached++;
-                }
-            }
-        }
-        // remove cache control from the first messages if there are too many cached messages
-        for ($i = 4; $i < count($data->messages) && $cached > 4; $i += 6) {
-            if (isset($data->messages[$i]->content[0]->cache_control)) {
-                unset($data->messages[$i]->content[0]->cache_control);
-                $cached--;
-            }
-        }
+        $this->claude_messages_standard($data);
+        $this->add_cache_control($data);
 
         $anthropic = new Anthropic($this->user, $this->DEBUG);
         $content = $anthropic->claude($data, $enable_websearch, $on_stream_chunk);
@@ -326,6 +243,17 @@ class LLMConnector {
             "effort" => array_reduce(["kimi"], fn($carry, $model) => $carry || strpos($data->model, $model) !== false, false) ? "none" : "medium"
         );
         $data->data_collection = "deny";
+        if (str_contains($data->model, "claude")) {
+            $this->claude_messages_standard($data);
+            if (isset($data->system)) {
+                array_unshift($data->messages, (object) array(
+                    "role" => "system",
+                    "content" => $data->system
+                ));
+                unset($data->system);
+            }
+        }
+        $this->add_cache_control($data);
         $message = $openrouter->message($data);
         if (is_string($message)) {
             return $message;
@@ -490,5 +418,95 @@ class LLMConnector {
         $estimate = $base + ($specials * 0.5);
 
         return max(1, intval(round($estimate)));
+    }
+
+    public static function add_cache_control($data) {
+        // set prompt caching for every sixth message
+        $cached = 0;
+        for ($i = 0; $i < count($data->messages); $i++) {
+            if ($i % 6 == 4) {
+                if (is_string($data->messages[$i]->content)) {
+                    $data->messages[$i]->content = array((object) array(
+                        "type" => "text",
+                        "text" => $data->messages[$i]->content,
+                        "cache_control" => (object) array("type" => "ephemeral")
+                    ));
+                    $cached++;
+                }
+                // images
+                else if (isset($data->messages[$i]->content[0]->type)) {
+                    $data->messages[$i]->content[0]->cache_control = (object) array("type" => "ephemeral");
+                    $cached++;
+                }
+            }
+        }
+        // remove cache control from the first messages if there are too many cached messages
+        for ($i = 4; $i < count($data->messages) && $cached > 4; $i += 6) {
+            if (isset($data->messages[$i]->content[0]->cache_control)) {
+                unset($data->messages[$i]->content[0]->cache_control);
+                $cached--;
+            }
+        }
+    }
+
+    public static function claude_messages_standard($data) {
+        // Collect initial system messages
+        $system_message = "";
+        while (count($data->messages) > 0 && $data->messages[0]->role === "system") {
+            if (is_string($data->messages[0]->content)) {
+                if ($system_message !== "") {
+                    $system_message .= "\n\n";
+                }
+                $system_message .= $data->messages[0]->content;
+            }
+            array_splice($data->messages, 0, 1);
+        }
+        if ($system_message !== "") {
+            $data->system = $system_message;
+        }
+
+        // Convert any remaining system messages to user messages with SYSTEM GUIDANCE prefix
+        for ($i = 0; $i < count($data->messages); $i++) {
+            $mes = $data->messages[$i];
+            if ($mes->role === "system") {
+                $mes->role = "user";
+                if (is_string($mes->content)) {
+                    $mes->content = "SYSTEM GUIDANCE: " . $mes->content;
+                }
+                else {
+                    for ($j = 0; $j < count($mes->content); $j++) {
+                        if (isset($mes->content[$j]->text)) {
+                            $mes->content[$j]->text = "SYSTEM GUIDANCE: " . $mes->content[$j]->text;
+                        }
+                    }
+                }
+            }
+        }
+
+        // aggregate directly consecutive messages of the same role
+        for ($i = 0; $i < count($data->messages) - 1; $i++) {
+            if ($data->messages[$i]->role === $data->messages[$i + 1]->role) {
+                // First message: convert string to array with text object
+                if (is_string($data->messages[$i]->content)) {
+                    $data->messages[$i]->content = array((object) array(
+                        "type" => "text",
+                        "text" => $data->messages[$i]->content
+                    ));
+                }
+
+                // Second message: convert string to array with text object
+                if (is_string($data->messages[$i + 1]->content)) {
+                    $data->messages[$i + 1]->content = array((object) array(
+                        "type" => "text",
+                        "text" => $data->messages[$i + 1]->content
+                    ));
+                }
+
+                // Merge the content arrays
+                $data->messages[$i]->content = array_merge($data->messages[$i]->content, $data->messages[$i + 1]->content);
+                array_splice($data->messages, $i + 1, 1);
+                $i--; // Recheck the current index since we removed an element
+            }
+        }
     }
 }
