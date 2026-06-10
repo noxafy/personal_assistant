@@ -1784,6 +1784,57 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             exit;
         }, "Misc", "Dump all messages in the chat history. You can dump only the last n messages by providing a number with the command (e.g. \"/dm 3\" to dump the last 3 messages).");
 
+        // The command /history outputs the full chat history as a single message (truncated if too long)
+        $command_manager->add_command(array("/history", "/hist", "/dms"), function($command, $n) use ($telegram, $user_config_manager) {
+            if ($command == "/dms") {
+                $command = "/history";
+                $n = 1;
+            }
+            $messages = $user_config_manager->get_config()->messages;
+            $n_total = count($messages);
+            $n_total > 0 || $telegram->die("There are no messages in the chat history.");
+            // If a number is provided, only show the last n messages
+            if ($n != "") {
+                is_numeric($n) || $telegram->die("Please provide a number of messages to show");
+                $n = intval($n);
+                if ($n == 0) {
+                    $telegram->die("Please provide a positive number of messages to show. Use /cnt to just show aggregate statistics about the chat history.");
+                }
+                $n > 0 || $telegram->die("Please provide a positive number of messages to show.");
+                $messages = array_slice($messages, -$n);
+            }
+            // Summary message
+            $n_messages = count($messages);
+            $summary = "Chat history";
+            if ($n_messages < $n_total) {
+                if ($n_messages == 1) {
+                    $summary .= " (last 1 message)";
+                } else {
+                    $summary .= " (last $n_messages messages)";
+                }
+            }
+            $summary .= ":";
+            foreach ($messages as $i => $message) {
+                $summary .= "\n";
+                $content = is_string($message->content) ? $message->content : json_encode($message->content);
+                $word_count = str_word_count($content);
+                $show_n_chars = 45 - strlen((string)$word_count) - strlen($message->role);
+                $first = mb_substr(trim($content), 0, $show_n_chars);
+                $first = str_replace("\n", " ", $first);
+                $msg_number = $n_total - $n_messages + $i + 1;
+                // $msg_number_neg = -$n_messages + $i;
+                $summary .= "$msg_number. /{$message->role} [{$word_count} words]: \"$first";
+                if (mb_strlen($content) > $show_n_chars-3) $summary .= "...";
+                $summary .= "\"";
+            }
+            // Append aggregate statistics like in /cnt
+            $stats = get_message_stats($messages);
+            $summary .= "\n\nTotal: {$stats['messages']} messages, {$stats['words']} words ≈ {$stats['tokens']} tokens.";
+            $telegram->send_message($summary, false);
+            exit;
+        }, "Misc", "Give a summarized view of the current chat history");
+
+
         // The command /cnt outputs the number of messages in the chat history
         $command_manager->add_command(array("/cnt"), function($command, $_) use ($telegram, $user_config_manager) {
             $messages = $user_config_manager->get_config()->messages;
