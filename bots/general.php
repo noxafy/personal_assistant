@@ -48,12 +48,15 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             assert(is_array($result));
             // Format paper information for the chat
             $paper_title = $result['title'];
+            if ($paper_title !== "") {
+                $paper_title = " \"$paper_title\"";
+            }
             $tex_content = $result['content'];
             $stats = get_message_stats($tex_content);
-            $telegram->send_message("arXiv:$arxiv_id \"$paper_title\" ({$stats['words']} words ≈ {$stats['tokens']} tokens). Write /continue to obtain a response.");
+            $telegram->send_message("arXiv:$arxiv_id$paper_title ({$stats['words']} words ≈ {$stats['tokens']} tokens). Send a message (or use /continue) to obtain a response.");
 
             // Format the message with paper content and metadata
-            $message = "arXiv:$arxiv_id \"$paper_title\"\n\n```\n$tex_content\n```";
+            $message = "arXiv:$arxiv_id$paper_title\n\n```\n$tex_content\n```";
             if ($user_message !== '') {
                 $message .= "\n\n$user_message";
             }
@@ -110,7 +113,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 $telegram->die("Error: Content is too long ({$stats['words']} words). Maximum size is 42,000 words.");
             }
 
-            $telegram->send_message("Link processed ({$stats['words']} words ≈ {$stats['tokens']} tokens). Write /continue to obtain a response.");
+            $telegram->send_message("Link processed ({$stats['words']} words ≈ {$stats['tokens']} tokens). Send a message (or use /continue) to obtain a response.");
 
             // Store the content and user message for later use, but do not display it now
             $message = "Link: $link\n\n```\n$content\n```";
@@ -204,7 +207,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         if ($stats['words'] > 42000) {
             $telegram->die("Error: Content is too long ({$stats['words']} words). Maximum size is 42,000 words.");
         }
-        $telegram->send_message("$label file processed ({$stats['words']} words ≈ {$stats['tokens']} tokens). Write /continue to obtain a response.");
+        $telegram->send_message("$label file processed ({$stats['words']} words ≈ {$stats['tokens']} tokens). Send a message (or use /continue) to obtain a response.");
         $message = "$label: \"{$title}\"\n\n```\n$content\n```";
         if (!empty($caption)) {
             $message .= "\n\n$caption";
