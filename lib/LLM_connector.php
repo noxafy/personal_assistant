@@ -103,6 +103,10 @@ class LLMConnector {
         if (!$is_reasoning_model && !str_starts_with($data->model, "gpt-")) {
             return "Error: Model \"{$data->model}\" is not a supported OpenAI model";
         }
+        if (isset($data->max_tokens)) {
+            $data->max_output_tokens = $data->max_tokens;
+            unset($data->max_tokens);
+        }
 
         if ($is_reasoning_model) {
             // replace all "system" roles with "developer"
@@ -172,10 +176,10 @@ class LLMConnector {
                 "type" => "enabled",
                 "budget_tokens" => (str_contains($data->model, "opus") ? 8000 : 32000)
             );
-            // remove temperature parameter
-            if (isset($data->temperature)) {
-                unset($data->temperature);
-            }
+        }
+        // remove temperature parameter
+        if (isset($data->temperature) && !preg_match('/4-0|4-1|4-5|4-6|sonnet|-thinking/i', $data->model)) {
+            unset($data->temperature);
         }
 
         // download and base64 encode any image
