@@ -81,7 +81,7 @@ class Telegram {
             "server_response" => $server_output,
             "data" => $data,
         ));
-        if ($endpoint == "sendMessage") {
+        if ($endpoint == "sendMessage" || $endpoint == "editMessageText") {
             // let the function handle it
             return $server_output;
         } else if (is_string($server_output)) {
@@ -142,65 +142,151 @@ class Telegram {
     }
 
     /**
-     * Send a message to Telegram.
+     * Send a message to Telegram, or edit an existing message when $message_id is provided.
      *
      * @param string $message The message to send.
      * @param bool $is_markdown (optional) Whether the message is markdown or not. Default: true.
-     * @return void
+     * @param int|null $message_id (optional) Existing Telegram message ID to edit. If null, sends a new message.
+     * @return array|null Metadata of the last resulting message:
+     *   - id: int|null
+     *   - len: int
      */
-    public function send_message($message, $is_markdown = true): void {
+    public function send_message($message, $is_markdown = true, $message_id = null): ?array {
         if (empty($message) || trim($message) == "") {
             Log::error(array(
                 "interface" => "telegram",
                 "message" => "Empty message [$message]",
             ));
-            return;
+            return null;
         }
+
         $messages = $this->split_message($message);
         if (count($messages) > 1) {
-            foreach ($messages as $m) {
-                $this->send_message($m, $is_markdown);
-            }
-        } else {
-            $data = (object) array(
-                "chat_id" => $this->chat_id,
-                "text" => $is_markdown ? $this->format_message($message, $this->post_processing) : $message,
-                // "text" => $message,
-                "disable_web_page_preview" => "true",
-            );
-            if ($is_markdown) {
-                $data->parse_mode = $this->post_processing ? "MarkdownV2" : "Markdown";
-            }
-            $server_output = $this->send("sendMessage", $data);
-            if ($this->RETRY_CNT == $this->MAX_RETRY) {
-                Log::error(array(
-                    "interface" => "telegram",
-                    "message" => "Max retry count reached for send_message.",
-                    "data" => $data,
-                    "server_response" => $server_output,
-                ));
-            }
-            elseif ($server_output != null && !is_string($server_output) && !$server_output->ok) {
-                // Try again without parse mode if $server_output is a string that contains "can't parse entities"
-                if (strpos($server_output->description, "can't parse entities") !== false) {
-                    if ($this->DEBUG) {
-                        $message = "[DEBUG: Failed with `".json_encode($server_output->description, JSON_UNESCAPED_UNICODE)
-                            ."`]\n\n".$this->format_message($message);
-                    }
-                    $this->send_message($message, false);
-                }
-                // Try again after a few seconds
-                else if ($this->RETRY_CNT < $this->MAX_RETRY) {
-                    // echo "Retry number: " . ($this->RETRY_CNT + 1) . "\n";
-                    $this->RETRY_CNT++;
-                    sleep(5*$this->RETRY_CNT);
-                    if ($this->DEBUG) {
-                        $data->text = "\[Retry $this->RETRY_CNT\] $data->text";
-                    }
-                    $this->send_message($message, $is_markdown);
+            $last_meta = null;
+            foreach ($messages as $idx => $part) {
+                $part_message_id = ($idx === 0) ? $message_id : null;
+                $meta = $this->send_message($part, $is_markdown, $part_message_id);
+                if ($meta !== null) {
+                    $last_meta = $meta;
                 }
             }
+            return $last_meta;
         }
+
+        $data = (object) array(
+            "chat_id" => $this->chat_id,
+            "text" => $is_markdown ? $this->format_message($message, $this->post_processing) : $message,
+            "disable_web_page_preview" => "true",
+        );
+        if ($is_markdown) {
+            $data->parse_mode = $this->post_processing ? "MarkdownV2" : "Markdown";
+        }
+
+        $endpoint = "sendMessage";
+        if ($message_id !== null) {
+            $endpoint = "editMessageText";
+            $data->message_id = $message_id;
+        }
+
+        $server_output = $this->send($endpoint, $data);
+        if ($this->RETRY_CNT == $this->MAX_RETRY) {
+            Log::error(array(
+                "interface" => "telegram",
+                "message" => "Max retry count reached for send_message.",
+                "data" => $data,
+                "server_response" => $server_output,
+            ));
+            return null;
+        }
+
+        if ($server_output != null && !is_string($server_output) && !$server_output->ok) {
+            // Try again without parse mode if Telegram can't parse entities
+            if (isset($server_output->description) && strpos($server_output->description, "can't parse entities") !== false) {
+                if ($this->DEBUG) {
+                    $message = "[DEBUG: Failed with `".json_encode($server_output->description, JSON_UNESCAPED_UNICODE)
+                        ."`]\n\n".$this->format_message($message);
+                }
+                return $this->send_message($message, false, $message_id);
+            }
+
+            // Retry after a few seconds
+            if ($this->RETRY_CNT < $this->MAX_RETRY) {
+                $this->RETRY_CNT++;
+                sleep(5*$this->RETRY_CNT);
+                if ($this->DEBUG) {
+                    $data->text = "\[Retry $this->RETRY_CNT\] $data->text";
+                }
+                return $this->send_message($message, $is_markdown, $message_id);
+            }
+            return null;
+        }
+
+        $this->RETRY_CNT = 0;
+
+        $resolved_id = $message_id;
+        if ($server_output != null && !is_string($server_output) && isset($server_output->result->message_id)) {
+            $resolved_id = intval($server_output->result->message_id);
+        }
+
+        return array(
+            "id" => $resolved_id,
+            "len" => strlen($message),
+        );
+    }
+
+    /**
+     * Create a Telegram-native streaming accumulator for chunked text updates.
+     *
+     * It batches incoming chunks and only sends/edits a Telegram message when:
+     * - at least one chunk has arrived, and
+     * - the configured interval has elapsed since the first chunk in the current batch.
+     *
+     * The first Telegram message is created only on the first flush.
+     *
+     * @param float $interval_seconds Flush interval in seconds (default: 0.5).
+     * @param bool $is_markdown Whether Telegram markdown formatting should be used.
+     * @return object { on_chunk: callable, flush: callable }
+     */
+    public function create_streaming_accumulator($interval_seconds = 0.5, $is_markdown = true) {
+        $stream_buffer = "";
+        $stream_started_at = null;
+        $message_id = null;
+
+        $flush = function() use (&$stream_buffer, &$stream_started_at, &$message_id, $is_markdown) {
+            if ($stream_buffer === "") {
+                return;
+            }
+
+            $stream_started_at = null;
+
+            $meta = $this->send_message($stream_buffer, $is_markdown, $message_id);
+            $meta !== null || exit;  // if we can't send, no point in keeping accumulating
+            $message_id = $meta["id"];
+            $stream_buffer = substr($stream_buffer, -$meta["len"]);
+        };
+
+        $on_chunk = function($chunk) use (&$stream_buffer, &$stream_started_at, $interval_seconds, $flush) {
+            if (!is_string($chunk) || $chunk === "") {
+                return;
+            }
+
+            $stream_buffer .= $chunk;
+            $now = microtime(true);
+
+            if ($stream_started_at === null) {
+                $stream_started_at = $now;
+                return;
+            }
+
+            if (($now - $stream_started_at) >= $interval_seconds) {
+                $flush();
+            }
+        };
+
+        return (object) array(
+            "on_chunk" => $on_chunk,
+            "flush" => $flush
+        );
     }
 
     /**

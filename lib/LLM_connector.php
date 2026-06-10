@@ -43,9 +43,10 @@ class LLMConnector {
      *
      * @param object|array $data The data to send.
      * @param bool $enable_websearch Whether to enable websearch in the output (default: false).
+     * @param callable|null $on_stream_chunk Callback that receives streamed text delta chunks.
      * @return string|array The response from the model or an error message (starts with "Error: ").
      */
-    public function message($data, $enable_websearch = false): string|array {
+    public function message($data, $enable_websearch = false, $on_stream_chunk = null): string|array {
         $data = json_decode(json_encode($data, JSON_UNESCAPED_UNICODE), false);  // copy data do not modify the original object
         if (!isset($data->max_tokens)) {
             $data->max_tokens = 2048;
@@ -61,7 +62,7 @@ class LLMConnector {
         }
 
         if (str_starts_with($data->model, "claude-")) {
-            $result = $this->parse_claude($data, $enable_websearch);
+            $result = $this->parse_claude($data, $enable_websearch, $on_stream_chunk);
         } else if (strpos($data->model, "/") !== false) {
             $result = $this->parse_openrouter($data);
         } else {
@@ -143,9 +144,10 @@ class LLMConnector {
      *
      * @param object|array $data The data to send.
      * @param bool $enable_websearch Whether to enable websearch in the output (default: false).
+     * @param callable|null $on_stream_chunk Callback that receives streamed text delta chunks.
      * @return string|array The response from the model or an error message.
      */
-    private function parse_claude($data, $enable_websearch = false): string|array {
+    private function parse_claude($data, $enable_websearch = false, $on_stream_chunk = null): string|array {
         // Allow thinking if the desired
         if (str_ends_with($data->model, "-thinking")) {
             // remove the "-thinking" suffix
@@ -270,7 +272,7 @@ class LLMConnector {
         }
 
         $anthropic = new Anthropic($this->user, $this->DEBUG);
-        $content = $anthropic->claude($data, $enable_websearch);
+        $content = $anthropic->claude($data, $enable_websearch, $on_stream_chunk);
         if (is_string($content)) {
             return $content;
         }

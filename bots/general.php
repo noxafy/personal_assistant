@@ -1923,11 +1923,23 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
     // $telegram->send_message("Sending message: ".$message);
     $chat = $user_config_manager->get_config();
-    $response = $llm->message($chat);
+    $use_streaming = false; // str_starts_with($chat->model, "claude-");
+
+    if ($use_streaming) {
+        $stream = $telegram->create_streaming_accumulator(0.5, true);
+        $response = $llm->message($chat, false, $stream->on_chunk);
+        ($stream->flush)();
+    } else {
+        $response = $llm->message($chat);
+    }
     if ($message === "/continue" || $message === "/c") {
         $telegram->die_if_error($response);
     } else {
         $telegram->die_if_error($response, $user_config_manager);
+    }
+    if ($use_streaming) {
+        $user_config_manager->add_message("assistant", $response);
+        return;
     }
 
     // If the response starts with "MAIL", parse the response and build a mailto link

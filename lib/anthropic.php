@@ -28,9 +28,10 @@ class Anthropic {
      *
      * @param object|array $data The data to send.
      * @param bool $enable_websearch Whether to enable web search (default: false).
+     * @param callable|null $on_chunk Callback that receives streamed text delta chunks. If null, the request is non-streaming.
      * @return array|string The response from Claude or an error message (starts with "Error: ").
      */
-    public function claude($data, $enable_websearch = false): array|string {
+    public function claude($data, $enable_websearch = false, $on_chunk = null): array|string {
         // Request a chat completion from Anthropic
         // The response has the following format:
         // $server_output = '{
@@ -73,7 +74,13 @@ class Anthropic {
             $data->tools = [["type" => "web_search_20250305", "name" => "web_search", "max_uses" => 3]];
         }
 
-        $response = $this->send_request("messages", $data);
+        if (is_callable($on_chunk)) {
+            $data->stream = true;
+            $response = $this->send_request_stream("messages", $data, $on_chunk);
+        } else {
+            $response = $this->send_request("messages", $data);
+        }
+
         if (has_error($response))
             return $response;
 
@@ -113,9 +120,10 @@ class Anthropic {
      *
      * @param string $endpoint The API endpoint.
      * @param object|array $data The data to send.
+     * @param callable|null $write_function Optional cURL write callback for streaming responses.
      * @return mixed The response from the API.
      */
-    private function send_request($endpoint, $data) {
+    private function send_request($endpoint, $data, $write_function = null) {
         $apikey = $this->user->get_anthropic_api_key();
         if (!$apikey) {
             return "Error: You need to set your Anthropic API key to talk with me. Use /anthropicapikey to set your Anthropic API key. "
@@ -126,7 +134,7 @@ class Anthropic {
         $url = "https://api.anthropic.com/v1/$endpoint";
         $headers = array('x-api-key: '.$apikey, 'anthropic-version: 2023-06-01', 'content-type: application/json');
 
-        $response = curl_post($url, $data, $headers);
+        $response = curl_post($url, $data, $headers, null, null, null, $write_function);
         if ($this->DEBUG) {
             $response_log = json_encode($response, JSON_UNESCAPED_UNICODE);
             if (strlen($response_log) > 10000) {
@@ -138,6 +146,10 @@ class Anthropic {
                 "data" => strip_long_messages($data),
                 "response" => $response_log,
             ));
+        }
+
+        if ($write_function !== null) {
+            return $response;
         }
 
         // {
@@ -163,13 +175,118 @@ class Anthropic {
                 if ($this->RETRY_CNT < $this->MAX_RETRY) {
                     $this->RETRY_CNT++;
                     sleep(5 * $this->RETRY_CNT);
-                    return $this->send_request($endpoint, $data);
+                    return $this->send_request($endpoint, $data, $write_function);
                 }
                 return 'Error: The Anthropic API is currently overloaded. Please use another /model or try again in a few minutes.';
             }
             // Return the error message
             return 'Error: '.$response->error->message.' ('.$response->error->type.')';
         }
+
         return $response;
+    }
+
+    /**
+     * Send a streaming request and reconstruct a final response payload.
+     *
+     * @param string $endpoint The API endpoint.
+     * @param object|array $data The data to send.
+     * @param callable|null $on_chunk Callback receiving text chunk deltas.
+     * @return object|string Final reconstructed response object or error string.
+     */
+    private function send_request_stream($endpoint, $data, $on_chunk = null): object|string {
+        $buffer = "";
+        $content_blocks = [];
+        $usage = (object) [];
+        $stream_error = null;
+        $emit = $on_chunk ?: function($chunk) {};
+
+        $handle_sse_line = function($line) use (&$content_blocks, &$usage, &$stream_error, $emit) {
+            $line = trim($line);
+            if ($line === "" || !str_starts_with($line, "data:")) {
+                return;
+            }
+
+            $payload = trim(substr($line, 5));
+            if ($payload === "" || $payload === "[DONE]") {
+                return;
+            }
+
+            $event = json_decode($payload);
+
+            switch ($event->type) {
+                case "error":
+                    $stream_error = "Error: ".$event->error->message." (".$event->error->type.")";
+                    break;
+
+                case "message_start":
+                    if (isset($event->message->usage)) {
+                        $usage = $event->message->usage;
+                    }
+                    break;
+
+                case "content_block_start":
+                    $idx = intval($event->index);
+                    $content_blocks[$idx] = (object) [
+                        "type" => "text",
+                        "text" => ($event->content_block->text ?? "")
+                    ];
+                    break;
+
+                case "content_block_delta":
+                    if ($event->delta->type !== "text_delta") {
+                        break;
+                    }
+                    $idx = intval($event->index);
+                    if (!isset($content_blocks[$idx])) {
+                        $content_blocks[$idx] = (object) ["type" => "text", "text" => ""];
+                    }
+                    $delta_text = $event->delta->text;
+                    $content_blocks[$idx]->text .= $delta_text;
+                    $emit($delta_text);
+                    break;
+
+                case "message_delta":
+                    if (isset($event->usage)) {
+                        $usage = $event->usage;
+                    }
+                    break;
+            }
+        };
+
+        $write_function = function($ch, $chunk) use (&$buffer, $handle_sse_line) {
+            $buffer .= $chunk;
+
+            while (($pos = strpos($buffer, "\n")) !== false) {
+                $line = substr($buffer, 0, $pos);
+                $buffer = substr($buffer, $pos + 1);
+                $handle_sse_line($line);
+            }
+
+            return strlen($chunk);
+        };
+
+        $response = $this->send_request($endpoint, $data, $write_function);
+
+        if ($buffer !== "") {
+            $handle_sse_line($buffer);
+        }
+
+        if (has_error($response)) {
+            return $response;
+        }
+        if ($stream_error) {
+            return $stream_error;
+        }
+        if (isset($response->http_code) && ($response->http_code < 200 || $response->http_code >= 300)) {
+            return "Error: (http: ".$response->http_code.") Failed to stream response from Anthropic.";
+        }
+
+        ksort($content_blocks);
+
+        return (object) array(
+            "content" => array_values($content_blocks),
+            "usage" => $usage
+        );
     }
 }

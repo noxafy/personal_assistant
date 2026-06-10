@@ -9,9 +9,10 @@
  * @param string $field_name (optional) The name of the field
  * @param string $file_name (optional) The name of the file
  * @param string $file_content (optional) The content of the file
+ * @param callable|null $write_function (optional) cURL write callback for streaming responses.
  * @return object|string The response from the API, error object with 'error' property, or error string
  */
-function curl_post($url, $data, $headers = array(), $field_name = null, $file_name = null, $file_content = null) {
+function curl_post($url, $data, $headers = array(), $field_name = null, $file_name = null, $file_content = null, $write_function = null) {
     if ($field_name != null && $file_name != null && $file_content != null) {
         $boundary = '-------------' . uniqid();
         $data = build_data_files($boundary, $data, $field_name, $file_name, $file_content);
@@ -26,7 +27,7 @@ function curl_post($url, $data, $headers = array(), $field_name = null, $file_na
             "Content-Length: " . strlen($data)
         ));
     }
-    return curl($url, $headers, $data);
+    return curl($url, $headers, $data, $write_function);
 }
 
 /**
@@ -35,16 +36,22 @@ function curl_post($url, $data, $headers = array(), $field_name = null, $file_na
  * @param string $url The URL to send the request to
  * @param array $headers Headers for the request
  * @param mixed $data Data for POST requests (null for GET)
+ * @param callable|null $write_function Optional cURL write callback for streaming responses.
  * @return object|string Response data, error object with 'error' property, or error string
  */
-function curl($url, $headers = array(), $data = null) {
+function curl($url, $headers = array(), $data = null, $write_function = null) {
     if (!filter_var($url, FILTER_VALIDATE_URL))
         return 'Error: Invalid URL format';
     $ch = curl_init($url);
     if ($ch === false)
         return 'Error: Failed to initialize cURL';
 
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    if ($write_function !== null) {
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, $write_function);
+    } else {
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    }
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     // curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Add timeout to prevent hanging requests
 
@@ -63,12 +70,23 @@ function curl($url, $headers = array(), $data = null) {
         $response = 'Error: (curl: '.curl_errno($ch).') '.curl_error($ch);
     } else {
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $response = json_decode($server_output, false);
-        if ($http_code < 200 || $http_code >= 300 || $server_output === false) {
-            if (isset($response->error) || isset($response->ok))
-                return $response;
-            $mes = $server_output ?? "No valid response from ".parse_url($url, PHP_URL_HOST);
-            return "Error: (http: $http_code) $mes";
+
+        if ($write_function !== null) {
+            if ($http_code < 200 || $http_code >= 300 || $server_output === false) {
+                $host = parse_url($url, PHP_URL_HOST);
+                $host = $host ? $host : "unknown host";
+                $response = "Error: (http: $http_code) Streaming request failed from ".$host;
+            } else {
+                $response = (object) array("ok" => true, "http_code" => $http_code);
+            }
+        } else {
+            $response = json_decode($server_output, false);
+            if ($http_code < 200 || $http_code >= 300 || $server_output === false) {
+                if (isset($response->error) || isset($response->ok))
+                    return $response;
+                $mes = $server_output ?? "No valid response from ".parse_url($url, PHP_URL_HOST);
+                return "Error: (http: $http_code) $mes";
+            }
         }
     }
     curl_close($ch);
