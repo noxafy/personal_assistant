@@ -1352,10 +1352,11 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             // unpack model and message
             $parts = explode(' ', $message, 2);
             $model = $parts[0];
-            if ($model == "prefix" || $model == "default" || $model == "reset" || $llm->check_model($model)) {
+            if ($model == "prefix" || $model == "default" || $llm->check_model($model)) {
                 $message = $parts[1] ?? "";
             } else {
-                $telegram->die("`$model` is not a valid specifier. Please provide \"default\", \"prefix\" or a (partial) model name.", true);
+                // $telegram->die("`$model` is not a valid specifier. Please provide \"default\", \"prefix\" or a (partial) model name.", true);
+                $model = "default";  // leave $message as is
             }
             $prefix_mes = "";
             if (!empty($user_config_manager->get_intro("prefix"))) {
@@ -1364,10 +1365,11 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             // assert !empty($model)
 
             // special case for prefix and default
+            if ($message == "reset" && !($model == "default" || $model == "prefix")) {
+                $user_config_manager->set_intro("", $model);
+                return "Your intro prompt for model `$model` has been reset.";
+            }
             if ($model == "prefix" || $model == "default" || $model == "reset") {
-                if ($model == "reset") {
-                    $telegram->die("`reset` is not a valid specifier. Please use `/intro <specifier> reset` to reset a prompt.", true);
-                }
                 $is_prefix = ($model == "prefix");
                 $type_label = $is_prefix ? "intro prefix" : "default intro prompt";
                 $reset_action = $is_prefix ? "delete it" : "revert to the general default prompt";
@@ -1409,12 +1411,6 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 return "You're using a custom intro prompt for model `$model`$prefix_mes:\n\n$intro_display\n\nYou can change it by providing a new prompt with the command as `/intro $model <new prompt>`. Use `/intro $model reset` to revert to the default prompt.";
             }
             // assert !empty($model) and !empty($message)
-
-            if ($message == "reset") {
-                $user_config_manager->set_intro("", $model);
-                $telegram->send_message("Your intro prompt for model `$model` has been reset.", true);
-                exit;
-            }
 
             $user_config_manager->set_intro($message, $model);
             $stats = get_message_stats($message);
