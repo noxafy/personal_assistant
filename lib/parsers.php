@@ -225,6 +225,22 @@ function get_arxiv_source($arxiv_id) {
  * @return string The cleaned TeX content
  */
 function clean_tex($tex_content) {
+    // Ensure valid UTF-8
+    if (!mb_check_encoding($tex_content, 'UTF-8')) {
+        // Try to detect common 8-bit encodings and convert
+        $detected = mb_detect_encoding($tex_content, ['UTF-8','ISO-8859-1','Windows-1252','ASCII'], true);
+        if ($detected && $detected !== 'UTF-8') {
+            $tex_content = mb_convert_encoding($tex_content, 'UTF-8', $detected);
+        } else {
+            // Fallback: assume Windows-1252 and strip invalid bytes
+            $tex_content = mb_convert_encoding($tex_content, 'UTF-8', 'Windows-1252');
+        }
+    }
+    // Strip C0 control characters (keep \t \n \r) and remove NULs
+    $tex_content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $tex_content);
+    // Normalize newlines
+    $tex_content = str_replace(["\r\n", "\r"], "\n", $tex_content);
+
     // Extract content between \begin{document} and \end{document}
     if (preg_match('/\\\\begin\s*{\s*document\s*}(.+)\\\\end\s*{\s*document\s*}/s', $tex_content, $matches)) {
         $tex_content = $matches[1];
