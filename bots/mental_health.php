@@ -240,11 +240,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 $chat->messages = array();
                 $user_config_manager->save_config($chat);
                 if ($user_config_manager->get_lang() == "de") {
-                    $telegram->send_message("Die Sitzung wurde noch nicht gestartet. Bitte schreibe etwas oder verwende den Befehl /start.");
+                    return "Die Sitzung wurde noch nicht gestartet. Bitte schreibe etwas oder verwende den Befehl /start.";
                 } else {
-                    $telegram->send_message("The session isn't started yet. Please write something or use the command /start.");
+                    return "The session isn't started yet. Please write something or use the command /start.";
                 }
-                exit;
             }
             if ($command == "/end" && $arg == "skip") {
                 $command = "/endskip";
@@ -279,11 +278,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 $summary = $llm->message($llm_chat);
                 if (has_error($summary)) {
                     if ($user_config_manager->get_lang() == "de") {
-                        $telegram->send_message("Entschuldigung, ich habe Probleme, mich mit dem Server zu verbinden. Bitte versuche es erneut /end.");
+                        return "Entschuldigung, ich habe Probleme, mich mit dem Server zu verbinden. Bitte versuche es erneut /end.";
                     } else {
-                        $telegram->send_message("Sorry, I am having trouble connecting to the server. Please try again /end.");
+                        return "Sorry, I am having trouble connecting to the server. Please try again /end.";
                     }
-                    exit;
                 }
 
                 if ($summary == "NOSUMMARY") {
@@ -373,15 +371,14 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             $user_config_manager->save_config($chat);
             $user_config_manager->save_session("session", $session_info);
             if ($user_config_manager->get_lang() == "de") {
-                $telegram->send_message("Sitzung beendet. Vielen Dank, dass du heute bei mir warst.");
+                return "Sitzung beendet. Vielen Dank, dass du heute bei mir warst.";
             } else {
-                $telegram->send_message("Session ended. Thank you for being with me today.");
+                return "Session ended. Thank you for being with me today.";
             }
-            exit;
         }, "Mental health", "End the current session. /endskip skips the session summary and profile update.");
 
         // The command /profile shows the profile of the user
-        $command_manager->add_command(array("/profile"), function($command, $_) use ($telegram, $user_config_manager) {
+        $command_manager->add_command(array("/profile"), function($command, $_) use ($user_config_manager) {
             $session_info = $user_config_manager->get_session("session");
             if ($session_info->profile == "") {
                 if ($user_config_manager->get_lang() == "de") {
@@ -397,27 +394,26 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     else
                         $message .= "Please start a new session with /start.";
                 }
-                $telegram->send_message($message);
+                return $message;
             } else {
                 $date = date("d.m.y g:ia", $session_info->last_session_start);
                 if ($user_config_manager->get_lang() == "de") {
-                    $telegram->send_message("Hier ist dein aktuelles Profil (erstellt am $date):\n\n$session_info->profile");
+                    return "Hier ist dein aktuelles Profil (erstellt am $date):\n\n$session_info->profile";
                 } else {
-                    $telegram->send_message("Here is your current profile (created $date):\n\n$session_info->profile");
+                    return "Here is your current profile (created $date):\n\n$session_info->profile";
                 }
             }
-            exit;
         }, "Mental health", "Show your profile");
 
         // The command /mode allows the user to change the mode
-        $command_manager->add_command(array("/mode"), function($command, $mode) use ($telegram, $user_config_manager, $mode_prompts) {
+        $command_manager->add_command(array("/mode"), function($command, $mode) use ($user_config_manager, $mode_prompts) {
             // Check if session is running
             $session_info = $user_config_manager->get_session("session");
             if ($mode == "") {
                 $mode_keys = array_keys($mode_prompts);
-                $telegram->send_message("The bot currently uses $session_info->mode. To change it, use /mode <mode>. Valid modes are: \"".implode("\", \"", $mode_keys)."\".");
+                return "The bot currently uses $session_info->mode. To change it, use /mode <mode>. Valid modes are: \"".implode("\", \"", $mode_keys)."\".";
             } else if ($session_info->running == true) {
-                $telegram->send_message("Please end the current session with /end before changing your mode.");
+                return "Please end the current session with /end before changing your mode.";
             } else {
                 if (strlen($mode) == 3) {
                     $mode = strtoupper($mode);
@@ -425,15 +421,13 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 // Get keys from $mode_prompts and check if $mode is a valid key
                 $mode_keys = array_keys($mode_prompts);
                 if (!in_array($mode, $mode_keys)) {
-                    $telegram->send_message("Sorry, I don't know the mode \"$mode\". Valid modes are: \"".implode("\", \"", $mode_keys)."\".");
-                    exit;
+                    return "Sorry, I don't know the mode \"$mode\". Valid modes are: \"".implode("\", \"", $mode_keys)."\".";
                 }
                 // Set the mode
                 $session_info->mode = $mode;
                 $user_config_manager->save_session("session", $session_info);
-                $telegram->send_message("Your mode has been set to $mode.");
+                return "Your mode has been set to $mode.";
             }
-            exit;
         }, "Settings", "Show or set the current method");
 
         // Shortcuts for models
@@ -485,40 +479,36 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         }, "Settings", "Model selection (default: `".UserConfigManager::$default_config["model"]."`)");
 
         // The command /name allows the user to change their name
-        $command_manager->add_command(array("/name"), function($command, $name) use ($telegram, $user_config_manager) {
+        $command_manager->add_command(array("/name"), function($command, $name) use ($user_config_manager) {
             // Check if session is running
             $session_info = $user_config_manager->get_session("session");
             if ($name == "") {
-                $telegram->send_message("Your name is currently set to ".$user_config_manager->get_name().". To set your name, you can provide a name with the command, e.g. \"/name Joe\".");
+                return "Your name is currently set to ".$user_config_manager->get_name().". To set your name, you can provide a name with the command, e.g. \"/name Joe\".";
             } else if ($session_info->running == true) {
-                $telegram->send_message("Please end the current session with /end before changing your name.");
+                return "Please end the current session with /end before changing your name.";
             } else {
                 // Replace name in profile
                 $old_name = $user_config_manager->get_name();
                 $session_info->profile = str_replace($old_name, $name, $session_info->profile);
                 // Set new name
                 $user_config_manager->set_name($name);
-                $telegram->send_message("Your name has been set to $name.");
+                return "Your name has been set to $name.";
             }
-            exit;
         }, "Settings", "Show or set your name");
 
         // The command /timezone allows the user to change their timezone
-        $command_manager->add_command(array("/timezone"), function($command, $timezone) use ($telegram, $user_config_manager) {
+        $command_manager->add_command(array("/timezone"), function($command, $timezone) use ($user_config_manager) {
             if ($timezone == "") {
-                $telegram->send_message("Your timezone is currently set to \"".$user_config_manager->get_timezone()."\". To change it, please provide a timezone with the command, e.g. \"/timezone Europe/Berlin\".");
-                exit;
+                return "Your timezone is currently set to \"".$user_config_manager->get_timezone()."\". To change it, please provide a timezone with the command, e.g. \"/timezone Europe/Berlin\".";
             }
             // Validate the timezone
             try {
                 new DateTimeZone($timezone);
             } catch (Exception $e) {
-                $telegram->send_message("The timezone \"$timezone\" is not valid. Please provide a valid timezone, e.g. \"/timezone Europe/Berlin\".");
-                exit;
+                return "The timezone \"$timezone\" is not valid. Please provide a valid timezone, e.g. \"/timezone Europe/Berlin\".";
             }
             $user_config_manager->set_timezone($timezone);
-            $telegram->send_message("Your timezone has been set to \"$timezone\".");
-            exit;
+            return "Your timezone has been set to \"$timezone\".";
         }, "Settings", "Set your timezone");
 
         // The command /lang allows the user to change their language
@@ -539,8 +529,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 exit;
             }
             $user_config_manager->set_lang($lang);
-            $telegram->send_message("Your language has been set to \"$lang\".");
-            exit;
+            return "Your language has been set to \"$lang\".";
         }, "Settings", "Set your language");
 
         // The command /reset deletes the current configuration
@@ -551,8 +540,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             $file_path = $user_config_manager->get_file();
             unlink($file_path); // Delete the file to create the default config on next message
 
-            $telegram->send_message("Your configuration has been reset to the default settings. You can start a new session with /start.");
-            exit;
+            return "Your configuration has been reset to the default settings. You can start a new session with /start.";
         }, "Settings", "Reset your configuration");
 
         // Command /restore restores the config from the backup file
@@ -562,14 +550,13 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             // Restore the backup
             try {
                 if($user_config_manager->restore_backup()) {
-                    $telegram->send_message("Backup restored. You can start a new session with /start.");
+                    return "Backup restored. You can start a new session with /start.";
                 } else {
-                    $telegram->send_message("There is no backup to restore. Please start a new session with /start.");
+                    return "There is no backup to restore. Please start a new session with /start.";
                 }
             } catch (Exception $e) {
-                $telegram->send_message("Error in reading backup file: ".$e->getMessage(), false);
+                $telegram->die("Error in reading backup file: ".$e->getMessage(), false);
             }
-            exit;
         }, "Settings", "Restore the config from the backup file");
 
         // The command /dailyreminder allows the user to toggle the daily reminder
@@ -581,8 +568,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 if ($job->chat_id == $chat_id && substr($job->name, 0, 13) == "dailyreminder") {
                     $job->status = $job->status == "active" ? "inactive" : "active";
                     $global_config_manager->save_jobs($jobs);
-                    $telegram->send_message("Daily reminder ".($job->status == "active" ? "activated" : "deactivated").".");
-                    exit;
+                    return "Daily reminder ".($job->status == "active" ? "activated" : "deactivated");
                 }
             }
             // Otherwise, create a new job
@@ -604,32 +590,28 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     ."Your message is sent in a chat, so you can make use of emojis. Spread love! \u2764\ufe0f"
 
             ));
-            $telegram->send_message("Daily reminder activated. You will receive a message from me once a day at a random time to check in with you.");
-            exit;
+            return "Daily reminder activated. You will receive a message from me once a day at a random time to check in with you.";
         }, "Settings", "Toggle the daily reminder");
 
         // The command /openaiapikey allows the user to set their custom OpenAI API key
         $command_manager->add_command(array("/openaiapikey"), function($command, $key) use ($telegram, $user_config_manager) {
             $key != "" || $telegram->die("Provide an API key with the command, e.g. \"/openaiapikey abc123\".");
             $user_config_manager->set_openai_api_key($key);
-            $telegram->send_message("Your new OpenAI API key has been set.");
-            exit;
+            return "Your new OpenAI API key has been set.";
         }, "Settings", "Set your own OpenAI API key");
 
         // The command /anthropicapikey allows the user to set their custom Anthropic API key
         $command_manager->add_command(array("/anthropicapikey"), function($command, $key) use ($telegram, $user_config_manager) {
             $key != "" || $telegram->die("Provide an API key with the command, e.g. \"/anthropicapikey abc123\".");
             $user_config_manager->set_anthropic_api_key($key);
-            $telegram->send_message("Your new Anthropic API key has been set.");
-            exit;
+            return "Your new Anthropic API key has been set.";
         }, "Settings", "Set your own Anthropic API key");
 
         // The command /openrouterapikey allows the user to set their custom OpenAI Router API key
         $command_manager->add_command(array("/openrouterapikey"), function($command, $key) use ($telegram, $user_config_manager) {
             $key != "" || $telegram->die("Provide an API key with the command, e.g. \"/openrouterapikey abc123\".");
             $user_config_manager->set_openrouter_api_key($key);
-            $telegram->send_message("Your new OpenAI Router API key has been set.");
-            exit;
+            return "Your new OpenAI Router API key has been set.";
         }, "Settings", "Set your own OpenAI Router API key");
 
         // The command /c allows to request another response from the model
@@ -646,8 +628,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
                 preg_match("/^[0-9]{4}$/", $month) || $telegram->die("Please provide a month in the format \"YYMM\".");
                 $usage = get_usage_string($user_config_manager, $month, true);
-                $telegram->send_message("Your usage statistics for ".($month == "" ? "this month" : $month).":\n\n$usage");
-                exit;
+                return "Your usage statistics for ".($month == "" ? "this month" : $month).":\n\n$usage";
             }, "Misc", "Show your usage statistics");
         }
 
@@ -657,7 +638,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
             // #######################
 
             // The command /voice requests a text-to-speech conversion from the model
-            $command_manager->add_command(array("/voice"), function($command, $arg) use ($telegram, $user_config_manager) {
+            $command_manager->add_command(array("/voice"), function($command, $arg) use ($user_config_manager) {
                 // Check if voice mode is active
                 $session_info = $user_config_manager->get_session("session");
                 if (!isset($session_info->voice_mode)) {
@@ -668,14 +649,13 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     // Turn on voice mode
                     $session_info->voice_mode = true;
                     $user_config_manager->save_session("session", $session_info);
-                    $telegram->send_message("Voice mode is now active. I will send my responses as voice messages. To turn it off, simply write /voice again.");
+                    return "Voice mode is now active. I will send my responses as voice messages. To turn it off, simply write /voice again.";
                 } else {
                     // Turn off voice mode
                     $session_info->voice_mode = false;
                     $user_config_manager->save_session("session", $session_info);
-                    $telegram->send_message("Voice mode is now inactive. I will send my responses as text messages. To turn it on, simply write /voice again.");
+                    return "Voice mode is now inactive. I will send my responses as text messages. To turn it on, simply write /voice again.";
                 }
-                exit;
             }, "Admin", "Toggle voice mode");
 
             // The command /addusermh adds a user to the list of authorized users
@@ -683,12 +663,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 ($username != "" && $username[0] == "@") || $telegram->die("Please provide a username to add.");
                 $username = substr($username, 1);
                 if ($global_config_manager->is_allowed_user($username, "general")) {
-                    $telegram->send_message("User @$username is already in the list of authorized users.");
-                    exit;
+                    return "User @$username is already in the list of authorized users.";
                 }
                 $global_config_manager->add_allowed_user($username, "general");
-                $telegram->send_message("Added user $username to the list of authorized users.");
-                exit;
+                return "Added user $username to the list of authorized users.";
             }, "Admin", "Add a user to access the bot");
 
             // The command /removeuser removes a user from the list of authorized users
@@ -699,8 +677,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     $username = substr($username, 1);
                 }
                 if (!$global_config_manager->is_allowed_user($username, "general")) {
-                    $telegram->send_message("User @$username is not in the list of authorized users.");
-                    exit;
+                    return "User @$username is not in the list of authorized users.";
                 }
                 try {
                     $global_config_manager->remove_allowed_user($username, "general");
@@ -708,12 +685,11 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     $telegram->send_message("Error: ".json_encode($e, JSON_UNESCAPED_UNICODE), false);
                     exit;
                 }
-                $telegram->send_message("Removed user @$username from the list of authorized users.");
-                exit;
+                return "Removed user @$username from the list of authorized users.";
             }, "Admin", "Remove a user from access to the bot");
 
             // The command /listusers lists all users authorized, by category
-            $command_manager->add_command(array("/listusers"), function($command, $_) use ($telegram, $global_config_manager) {
+            $command_manager->add_command(array("/listusers"), function($command, $_) use ($global_config_manager) {
                 $categories = $global_config_manager->get_categories();
                 $message = "Lists of authorized users, by category:\n";
                 foreach ($categories as $category) {
@@ -727,12 +703,11 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                         }
                     }
                 }
-                $telegram->send_message($message);
-                exit;
+                return $message;
             }, "Admin", "List all users authorized, by category");
 
             // Command /cnt outputs the number of messages in the chat history
-            $command_manager->add_command(array("/cnt"), function($command, $_) use ($telegram, $user_config_manager) {
+            $command_manager->add_command(array("/cnt"), function($command, $_) use ($user_config_manager) {
                 $messages = $user_config_manager->get_config()->messages;
                 $n_messages = count($messages);
                 $all_messages = implode("\n", array_map(function($message) {
@@ -741,13 +716,11 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                 $n_words = str_word_count($all_messages);
                 switch ($n_messages) {
                     case 0:
-                        $telegram->send_message("There are no messages (0 words) in the chat history.");
-                        break;
+                        return "There are no messages (0 words) in the chat history.";
                     case 1:
-                        $telegram->send_message("There is 1 message ($n_words words) in the chat history.");
-                        break;
+                        return "There is 1 message ($n_words words) in the chat history.";
                     default:
-                        $telegram->send_message("There are $n_messages messages ($n_words words) in the chat history.");
+                        return "There are $n_messages messages ($n_words words) in the chat history.";
                 }
             }, "Admin", "Output the number of messages and words in the chat history");
 
@@ -860,32 +833,28 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
                     // add usage info
                     $message .= get_usage_string($user, $month, false)."\n";
                 }
-                $telegram->send_message($message);
-                exit;
+                return $message;
             }, "Admin", "Print the usage statistics of all users for a given month (default: current month)");
 
             // The command /user adds a user message to the chat history
             $command_manager->add_command(array("/user", "/u"), function($command, $message) use ($telegram, $user_config_manager) {
                 $message != "" || $telegram->die("Please provide a message to add.");
                 $user_config_manager->add_message("user", $message);
-                $telegram->send_message("Added user message to chat history.");
-                exit;
+                return "Added user message to chat history.";
             }, "Chat history management", "Add a message with \"user\" role to the internal chat history");
 
             // The command /assistant adds an assistant message to the chat history
             $command_manager->add_command(array("/assistant", "/a"), function($command, $message) use ($telegram, $user_config_manager) {
                 $message != "" || $telegram->die("Please provide a message to add.");
                 $user_config_manager->add_message("assistant", $message);
-                $telegram->send_message("Added assistant message to chat history.");
-                exit;
+                return "Added assistant message to chat history.";
             }, "Chat history management", "Add a message with \"assistant\" role to the internal chat history");
 
             // The command /system adds a system message to the chat history
             $command_manager->add_command(array("/system", "/s"), function($command, $message) use ($telegram, $user_config_manager) {
                 $message != "" || $telegram->die("Please provide a message to add.");
                 $user_config_manager->add_message("system", $message);
-                $telegram->send_message("Added system message to chat history.");
-                exit;
+                return "Added system message to chat history.";
             }, "Chat history management", "Add a message with \"system\" role to the internal chat history");
         }
 
