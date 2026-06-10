@@ -1,5 +1,9 @@
 <?php
 
+// #################################
+// !!! EMERGENCY STOP LINE 54-58 !!!
+// #################################
+
 // This is for debugging
 $DEBUG=false;
 
@@ -47,7 +51,15 @@ $secret_token || Log::die("TELEGRAM_BOT_SECRET is not set.");
 $chat_id_admin = $global_config_manager->get("TELEGRAM_ADMIN_CHAT_ID");
 $chat_id_admin || Log::die("TELEGRAM_ADMIN_CHAT_ID is not set.");
 
-// ##### Emergency stop #####
+
+// #######################################
+// #######################################
+// #######################################
+// ##### !!! EMERGENCY STOP HERE !!! #####
+// #######################################
+// #######################################
+// #######################################
+
 // Log::debug("Emergency stop");
 // $telegram_admin = new Telegram($telegram_token, $chat_id_admin, $DEBUG);
 // $telegram_admin->send_message("This works again.");
