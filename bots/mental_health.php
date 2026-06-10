@@ -438,14 +438,22 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
 
         // Shortcuts for models
         $shortcuts_large = array(
-            "/claude46opus" => "claude-opus-4-6",
-            "/claude45opus" => "claude-opus-4-5",
-            "/claude4opus" => "claude-opus-4",
-            "/claude46sonnet" => "claude-sonnet-4-6",
-            "/claude45sonnet" => "claude-sonnet-4-5",
-            "/claude4sonnet" => "claude-sonnet-4-0",
-            "/gpt52" => "gpt-5.2-2025-12-11-medium",
+            // "/claude46opus" => "claude-opus-4-6",
+            // "/claude45opus" => "claude-opus-4-5",
+            // "/claude4opus" => "claude-opus-4",
+            // "/claude46sonnet" => "claude-sonnet-4-6",
+            // "/claude45sonnet" => "claude-sonnet-4-5",
+            // "/claude4sonnet" => "claude-sonnet-4-0",
+            "/claude5fable" => "anthropic/claude-fable-5",         #          10.00/50.00
+            "/claude48opus" => "anthropic/claude-opus-4.8",
+            "/claude47opus" => "anthropic/claude-opus-4.7",
+            "/claude46opus" => "anthropic/claude-opus-4.6",
+            "/claude45opus" => "anthropic/claude-opus-4.5",
+            "/claude46sonnet" => "anthropic/claude-sonnet-4.6",
+            "/claude45sonnet" => "anthropic/claude-sonnet-4.5",
+            "/gpt52" => "gpt-5.2",
             "/gpt41" => "gpt-4.1",
+            "/gemma4" => "google/gemma-4-31b-it",
             "/mistrallarge3" => "mistralai/mistral-large-2512"
         );
 
