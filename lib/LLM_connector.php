@@ -48,7 +48,10 @@ class LLMConnector {
      */
     public function message($data, $enable_websearch = false, $on_stream_chunk = null): string|array {
         $data = json_decode(json_encode($data, JSON_UNESCAPED_UNICODE), false);  // copy data do not modify the original object
-        if (!isset($data->max_tokens)) {
+        // if (!isset($data->max_tokens)) {
+        $data->max_tokens = 2048*3;
+        // }
+        if (strpos($data->model, 'opus') !== false) {
             $data->max_tokens = 2048;
         }
 
@@ -73,6 +76,9 @@ class LLMConnector {
             return $result;
 
         $this->user->set_last_thinking_output($result['thinking'] ?? "");  // always override previous reasoning output
+        if ($result['content'] === null) {
+            return "Error: The model has used all available tokens for thinking and I haven't implemented a way to let it continue (sorry!). You can probably see the thinking using /thinkingoutput to see it, or use /thinkingoutputraw and add it manually to let it continue.";
+        }
         return $result['content'];
     }
 
