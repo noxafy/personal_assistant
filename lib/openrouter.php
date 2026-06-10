@@ -36,6 +36,12 @@ class OpenRouter {
             $month = date("ym");
             $this->user->increment("OpenRouter_".$month."_".$model."_prompt_tokens", $response->usage->prompt_tokens);
             $this->user->increment("OpenRouter_".$month."_".$model."_completion_tokens", $response->usage->completion_tokens);
+            Log::debug(array(
+                "interface" => "OpenRouter",
+                "endpoint" => "message",
+                "data" => $data,
+                "response" => $response,
+            ));
             return $response->choices[0]->message;
         }
         return $response;
@@ -76,14 +82,6 @@ class OpenRouter {
             ));
         }
 
-        // {
-        //     "error": {
-        //         "message": "0.1 is not of type number - temperature",
-        //         "type": "invalid_request_error",
-        //         "param": null,
-        //         "code": null
-        //     }
-        // }
         if (isset($response->error)) {
             if (is_string($data)) {
                 $data = json_decode($data);
@@ -94,7 +92,39 @@ class OpenRouter {
                 "data" => $data,
                 "response" => $response,
             ));
+            // OpenRouter error
+            // {
+            //     "error": {
+            //         "message": "0.1 is not of type number - temperature",
+            //         "type": "invalid_request_error",
+            //         "param": null,
+            //         "code": null
+            //     }
+            // }
+            // Provider error
+            // {
+            //     "error": {
+            //         "message": "Provider returned error",
+            //         "code": 400,
+            //         "metadata": {
+            //             "raw": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"This model does not support assistant message prefill. The conversation must end with a user message.\"},\"request_id\":\"req_XXX\"}",
+            //             "provider_name": "Azure",
+            //             "is_byok": false,
+            //             "previous_errors": [...]
+            //         }
+            //     },
+            //     "user_id": "user_XXX"
+            // }
+
             // Return the error message
+            if (isset($response->error->metadata->raw)) {
+                $error = json_decode($response->error->metadata->raw);
+                if ($error !== false && isset($error->type) && $error->type === "error") {
+                    $response = $error;
+                } else {
+                    return 'Error: '.$response->error->metadata->raw;
+                }
+            }
             return 'Error: '.$response->error->message;
         }
         return $response;

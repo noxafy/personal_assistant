@@ -75,6 +75,15 @@ class LLMConnector {
         if (is_string($result))
             return $result;
 
+        if (!is_array($result) || !array_key_exists('content', $result)) {
+            Log::error(array(
+                "interface" => "LLMConnector",
+                "msg" => "Empty content from model",
+                "model" => $data->model ?? null,
+                "result" => $result
+            ));
+            return "Error: Model response was malformed.";
+        }
         $this->user->set_last_thinking_output($result['thinking'] ?? "");  // always override previous reasoning output
         if ($result['content'] === null) {
             return "Error: The model has used all available tokens for thinking and I haven't implemented a way to let it continue (sorry!). You can probably see the thinking using /thinkingoutput to see it, or use /thinkingoutputraw and add it manually to let it continue.";

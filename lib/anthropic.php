@@ -84,6 +84,16 @@ class Anthropic {
         if (has_error($response))
             return $response;
 
+        if (!isset($response->content)) {
+            Log::error(array(
+                "interface" => "anthropic",
+                "endpoint" => "messages",
+                "data" => strip_long_messages($data),
+                "response" => $response,
+            ));
+            return "Error: The response from Anthropic is not in the expected format: ".json_encode($response, JSON_UNESCAPED_UNICODE);
+        }
+
         // track token usage
         if (isset($response->usage)) {
             // Get a month year string
@@ -98,15 +108,6 @@ class Anthropic {
             }
         }
 
-        if (!isset($response->content)) {
-            Log::error(array(
-                "interface" => "anthropic",
-                "endpoint" => "messages",
-                "data" => strip_long_messages($data),
-                "response" => $response,
-            ));
-            return "Error: The response from Anthropic is not in the expected format: ".json_encode($response, JSON_UNESCAPED_UNICODE);
-        }
         // if ($this->DEBUG) {
         //     $month = date("ym");
         //     return $response->content[0]->text."\n\n"."Input: ".$response->usage->input_tokens." tokens\nOutput: ".$response->usage->output_tokens." tokens"
