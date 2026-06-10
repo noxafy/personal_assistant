@@ -1278,10 +1278,10 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         }, "Settings", "Show the current temperature or change it (default: ".UserConfigManager::$default_config["temperature"].")");
 
         // The command /thikingoutput fetches the last thinking output
-        $command_manager->add_command(array("/thinkingoutput"), function($command, $_) use ($telegram, $user_config_manager) {
+        $command_manager->add_command(array("/thinkingoutput", "/thinkingoutputraw"), function($command, $_) use ($telegram, $user_config_manager) {
             $thinking_output = $user_config_manager->get_last_thinking_output();
             $thinking_output != "" || $telegram->die("No thinking output available.");
-            $telegram->send_message($thinking_output);
+            $telegram->send_message($thinking_output, $command == "/thinkingoutput");
             exit;
         }, "Settings", "Fetch the last thinking output");
 
