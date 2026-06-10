@@ -97,7 +97,7 @@ function text_from_arxiv_id($arxiv_id) {
         return $source;
 
     // Get paper metadata from arXiv API
-    $paper_title = "arXiv:$arxiv_id";
+    $paper_title = "";
     $paper_url = "https://export.arxiv.org/api/query?id_list=$arxiv_id";
 
     $xml = @simplexml_load_file($paper_url);
