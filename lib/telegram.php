@@ -108,13 +108,51 @@ class Telegram {
             return array("Error: Message too long to send (".strlen($message)." characters).");
         }
 
+        // // If the message is too long and contains code blocks ("```") but doesn't start with one, add a newline before every opening "```"
+        // if (strlen($message) > $max_length - 1 && strpos($message, '```') !== false && !str_starts_with($message, '```')) {
+        //     $parts = preg_split('/(```)/', $message, -1, PREG_SPLIT_DELIM_CAPTURE);
+        //     $new_message = '';
+        //     $code_block_count = 0;
+        //     foreach ($parts as $part) {
+        //         if ($part === '```') {
+        //             if ($code_block_count % 2 == 0) {
+        //                 $new_message .= "\n";
+        //             }
+        //             $code_block_count++;
+        //         }
+        //         $new_message .= $part;
+        //     }
+        //     $message = $new_message;
+        // }
+
         // Split message into multiple messages via new lines
         $messages = explode("\n", $message);
+
+        // Merge lines into paragraphs, but if a paragraph contains an odd number of code block markers (```),
+        // merge with the next until the number is even (i.e., code block is closed)
+        $merged_messages = array();
+        $buffer = '';
+        foreach ($messages as $line) {
+            if ($buffer !== '') {
+                $buffer .= "\n";
+            }
+            $buffer .= $line;
+            if (preg_match_all('/```/', $buffer, $dummy) % 2 === 0) {
+                $merged_messages[] = $buffer;
+                $buffer = '';
+            }
+        }
+        if ($buffer !== '') {
+            $merged_messages[] = $buffer;
+        }
+        $messages = $merged_messages;
+
 
         // If a message is still longer than $max_length characters, split it into multiple messages via hard cuts
         $new_messages = array();
         foreach ($messages as $message) {
             if (strlen($message) > $max_length) {
+
                 $message_parts = str_split($message, $max_length-1);
                 foreach ($message_parts as $message_part) {
                     $new_messages[] = $message_part;
