@@ -246,7 +246,7 @@ function clean_tex($tex_content) {
         $tex_content = $matches[1];
     }
     // Remove comments
-    $tex_content = preg_replace('/(?<!\\\\)%.*$/m', '', $tex_content);
+    // $tex_content = preg_replace('/(?<!\\\\)%.*$/m', '', $tex_content);
     // Remove thebibliography section
     $tex_content = preg_replace('/\\\\begin\s*{\s*thebibliography\s*}.*?\\\\end\s*{\s*thebibliography\s*}/s', '', $tex_content);
     return $tex_content;
