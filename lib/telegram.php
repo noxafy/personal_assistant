@@ -53,23 +53,17 @@ class Telegram {
         $server_output = curl_post($url, $data, $headers, $field_name, $file_name, $file_content);
         // DEBUG endpoint, data, server_output, and optionally file_name and file_content
         if ($this->DEBUG) {
+            $log_data = array(
+                "interface" => "telegram",
+                "endpoint" => $endpoint,
+                "data" => $data,
+                "server_response" => $server_output,
+            );
             if ($file_name != null) {
-                Log::debug(array(
-                    "interface" => "telegram",
-                    "endpoint" => $endpoint,
-                    "data" => $data,
-                    "file_name" => $file_name,
-                    "file_content" => $file_content,
-                    "server_response" => $server_output,
-                ));
-            } else {
-                Log::debug(array(
-                    "interface" => "telegram",
-                    "endpoint" => $endpoint,
-                    "data" => $data,
-                    "server_response" => $server_output,
-                ));
+                $log_data["file_name"] = $file_name;
+                $log_data["file_content"] = $file_content;
             }
+            Log::debug($log_data);
         }
         if (isset($server_output->ok) && $server_output->ok) {
             return $server_output;

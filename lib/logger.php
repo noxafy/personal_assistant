@@ -60,7 +60,7 @@ class Log {
         if (!file_exists(self::$log_dir)) {
             mkdir(self::$log_dir);
         }
-        // $content is either a string or an array
+        // ensure $content is an array
         if (!is_array($content)) {
             $content = array("message" => $content);
         }

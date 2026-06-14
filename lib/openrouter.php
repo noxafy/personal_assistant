@@ -39,7 +39,7 @@ class OpenRouter {
             // Log::debug(array(
             //     "interface" => "OpenRouter",
             //     "endpoint" => "message",
-            //     "data" => $data,
+            //     "data" => strip_long_messages($data),
             //     "response" => $response,
             // ));
             return $response->choices[0]->message;
@@ -77,7 +77,7 @@ class OpenRouter {
             Log::debug(array(
                 "interface" => "OpenRouter",
                 "endpoint" => $endpoint,
-                "data" => $data,
+                "data" => strip_long_messages($data),
                 "response" => $response_log,
             ));
         }
