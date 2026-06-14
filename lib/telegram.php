@@ -156,8 +156,8 @@ class Telegram {
                 foreach ($message_parts as $message_part) {
                     $new_messages[] = $message_part;
                 }
-            } else if (strlen($message) > 0) {
-                $new_messages[] = $message;
+            } else if (strlen($mes) > 0) {
+                $new_messages[] = $mes;
             }
         }
         $messages = $new_messages;
