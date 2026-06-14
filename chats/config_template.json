@@ -13,5 +13,6 @@
         "general": [],
         "seen": []
     },
-    "jobs": []
+    "jobs": [],
+    "models_requiring_reasoning": ["ring", "gemini-3.", "fable"]
 }

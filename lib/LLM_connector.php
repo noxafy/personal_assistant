@@ -5,6 +5,7 @@ require_once __DIR__."/utils.php";
 require_once __DIR__."/openai.php";
 require_once __DIR__."/anthropic.php";
 require_once __DIR__."/openrouter.php";
+require_once __DIR__."/global_config_manager.php";
 
 /**
  * This class manages the connection to the large language models (LLM).
@@ -12,16 +13,19 @@ require_once __DIR__."/openrouter.php";
 class LLMConnector {
     public $DEBUG;
     public $user;
+    private $global_config_manager;
 
     /**
      * Create a new instance.
      *
      * @param UserConfigManager $user The user to use for the requests.
+     * @param GlobalConfigManager $global_config_manager The global config manager. If null, a new instance is created.
      * @param bool $DEBUG Whether to enable debug mode.
      */
-    public function __construct($user, $DEBUG = False) {
-        $this->DEBUG = $DEBUG;
+    public function __construct($user, $global_config_manager, $DEBUG = False) {
         $this->user = $user;
+        $this->global_config_manager = $global_config_manager;
+        $this->DEBUG = $DEBUG;
     }
 
     /**
@@ -239,15 +243,19 @@ class LLMConnector {
     private function parse_openrouter($data): string|array {
         $openrouter = new OpenRouter($this->user, $this->DEBUG);
         $effort = "none";
-        foreach (["ring", "gemini-3.", "fable"] as $keyword) {
-            if (strpos($data->model, $keyword) !== false) {
-                $effort = "low";
-                break;
-            }
-        }
+        $explicit_effort = false;
         if (preg_match('/^(.*?)-(none|low|minimal|medium|high|xhigh)$/', $data->model, $matches)) {
             $data->model = $matches[1];
             $effort = $matches[2];
+            $explicit_effort = true;
+        } else {
+            // Models that have been found to require reasoning on OpenRouter (cannot use effort "none")
+            foreach ($this->global_config_manager->get_models_requiring_reasoning() as $keyword) {
+                if (str_contains($data->model, $keyword)) {
+                    $effort = "low";
+                    break;
+                }
+            }
         }
         $data->reasoning = (object) array(
             // For some models, set effort to 'none'
@@ -266,6 +274,17 @@ class LLMConnector {
         }
         $this->add_cache_control($data);
         $message = $openrouter->message($data);
+        if (is_string($message) && !$explicit_effort && str_contains($message, "Reasoning is mandatory for this endpoint and cannot be disabled.")) {
+            // Remember this model so future requests default to use reasoning
+            $this->global_config_manager->add_model_requiring_reasoning($data->model);
+            Log::error(array(
+                "interface" => "LLMConnector",
+                "msg" => "Reasoning is mandatory for this model → Add to list",
+                "model" => $data->model ?? null
+            ));
+            $data->reasoning->effort = "low";
+            $message = $openrouter->message($data);
+        }
         if (is_string($message)) {
             return $message;
         }

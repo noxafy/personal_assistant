@@ -172,7 +172,7 @@ if ($is_admin || $global_config_manager->is_allowed_user($username, "general")) 
         }
     }
 
-    $llm = new LLMConnector($user_config_manager, $DEBUG);
+    $llm = new LLMConnector($user_config_manager, $global_config_manager, $DEBUG);
 
     // Set the time zone to give the correct time to the model
     date_default_timezone_set($user_config_manager->get_timezone());

@@ -161,6 +161,31 @@ class GlobalConfigManager {
     }
 
     /**
+     * Get the list of models (or model name fragments) that require a non-"none" reasoning
+     * effort. This applies only to the OpenRouter connection (see LLMConnector::parse_openrouter).
+     *
+     * @return array The list of model names/fragments.
+     */
+    public function get_models_requiring_reasoning() {
+        return $this->global_config->models_requiring_reasoning ?? [];
+    }
+
+    /**
+     * Add a model to the list of models that require a non-"none" reasoning effort.
+     * This applies only to the OpenRouter connection (see LLMConnector::parse_openrouter).
+     *
+     * @param string $model The model name to add.
+     */
+    public function add_model_requiring_reasoning($model) {
+        $models = $this->get_models_requiring_reasoning();
+        if (in_array($model, $models)) return;
+
+        $models[] = $model;
+        $this->global_config->models_requiring_reasoning = $models;
+        $this->save();
+    }
+
+    /**
      * Get the list of jobs.
      *
      * @return array The list of jobs.

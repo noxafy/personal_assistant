@@ -94,7 +94,7 @@ for ($i = 0; $i < count($jobs); $i++) {
         // Load the user config
         $user_config_manager = new UserConfigManager($job->chat_id);
         $config = clone $user_config_manager->get_config();
-        $llm = new LLMConnector($user_config_manager, $DEBUG);
+        $llm = new LLMConnector($user_config_manager, $global_config_manager, $DEBUG);
         date_default_timezone_set($user_config_manager->get_timezone());
         // If the last two messages are from the assistant, remove the last
         $cnt = count($config->messages);
