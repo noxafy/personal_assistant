@@ -116,7 +116,7 @@ function text_from_arxiv_id($arxiv_id) {
  * Downloads LaTeX source code from arXiv for a given paper ID
  *
  * @param string $arxiv_id The arXiv ID (e.g., "2301.00001")
- * @return string|false The LaTeX source code or false on failure
+ * @return string The LaTeX source code or an error message on failure
  */
 function get_arxiv_source($arxiv_id) {
     // Clean the ID
@@ -147,8 +147,7 @@ function get_arxiv_source($arxiv_id) {
         // try pure .gz (gzip)
         $content = file_get_contents("compress.zlib://$temp_file");
         if ($content === false) {
-            array_map('unlink', glob("$temp_dir/*"));
-            rmdir($temp_dir);
+            exec('rm -rf '.escapeshellarg($temp_dir));
             return "Error: Failed to extract arXiv source archive.";
         }
         file_put_contents("$temp_dir/source.tex", $content);
@@ -174,8 +173,7 @@ function get_arxiv_source($arxiv_id) {
             $tex_files = glob("$temp_dir/*/*.tex");
         }
         if (empty($tex_files)) {
-            array_map('unlink', glob("$temp_dir/*"));
-            rmdir($temp_dir);
+            exec('rm -rf '.escapeshellarg($temp_dir));
             return "Error: No TeX files found in the archive.";
         }
     }
@@ -198,8 +196,7 @@ function get_arxiv_source($arxiv_id) {
     //     }
     // }
     if ($main_file === null) {
-        array_map('unlink', glob("$temp_dir/*"));
-        rmdir($temp_dir);
+        exec('rm -rf '.escapeshellarg($temp_dir));
         return "Error: Could not identify main TeX file.";
     }
 
@@ -207,10 +204,7 @@ function get_arxiv_source($arxiv_id) {
     $tex_content = file_get_contents($main_file);
 
     // Clean up
-    array_map('unlink', glob("$temp_dir/*"));
-    array_map('unlink', glob("$temp_dir/*/*"));
-    array_map('rmdir', glob("$temp_dir/*"));
-    rmdir($temp_dir);
+    exec('rm -rf '.escapeshellarg($temp_dir));
 
     // Process the TeX content
     if (!$tex_content)
