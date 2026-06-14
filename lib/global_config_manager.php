@@ -4,7 +4,7 @@ require_once __DIR__."/utils.php";
 
 /**
  * This class manages the persistent data for all chats.
- * 
+ *
  * The JSON file is located in "chats/config.json". It has the following format:
  * ```json
  * {
@@ -56,7 +56,7 @@ class GlobalConfigManager {
 
     /**
      * Get a config value.
-     * 
+     *
      * @param string $key The key of the config value.
      * @return mixed The value of the config value.
      */
@@ -77,7 +77,7 @@ class GlobalConfigManager {
 
     /**
      * Check if a user is allowed to use the assistant.
-     * 
+     *
      * @param string $username The username of the user.
      * @param string $category The category of the user.
      * @return bool True if the user is allowed to use the assistant.
@@ -92,7 +92,7 @@ class GlobalConfigManager {
 
     /**
      * Get the list of allowed users.
-     * 
+     *
      * @param string $category The category of the user.
      * @return array The list of users registered in the given category.
      */
@@ -102,21 +102,21 @@ class GlobalConfigManager {
 
     /**
      * Add a user to the list of allowed users.
-     * 
+     *
      * @param string $username The username of the user.
      * @param string $category The category to add the user to.
      */
     public function add_allowed_user($username, $category = "general") {
         if ($username == null || $username == "") return;
         if (!isset($this->global_config->users->$category)) return;
-    
+
         $this->global_config->users->$category[] = $username;
         $this->save();
     }
 
     /**
      * Remove a user from the list of allowed users for the given category.
-     * 
+     *
      * @param string $username The username of the user.
      * @param string $category The category to remove the user from.
      */
@@ -153,7 +153,7 @@ class GlobalConfigManager {
 
     /**
      * Get the list of valid categories for user groups.
-     * 
+     *
      * @return array The list of valid categories for user groups.
      */
     public function get_categories() {
@@ -162,7 +162,7 @@ class GlobalConfigManager {
 
     /**
      * Get the list of jobs.
-     * 
+     *
      * @return array The list of jobs.
      */
     public function get_jobs() {
@@ -171,7 +171,7 @@ class GlobalConfigManager {
 
     /**
      * Save the list of jobs.
-     * 
+     *
      * @param array $jobs The list of jobs.
      */
     public function save_jobs($jobs) {
@@ -181,7 +181,7 @@ class GlobalConfigManager {
 
     /**
      * Add a job to the list of jobs.
-     * 
+     *
      * @param object $job The job to add.
      */
     public function add_job($job) {
@@ -191,7 +191,7 @@ class GlobalConfigManager {
 
     /**
      * Get the list of chatids
-     * 
+     *
      * @return array The list of chatids.
      */
     public function get_chatids() {

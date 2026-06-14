@@ -1289,7 +1289,7 @@ function run_bot($update, $user_config_manager, $telegram, $llm, $telegram_admin
         $command_manager->add_command(array("/postprocessing"), function($command, $_) use ($user_config_manager) {
             $active = $user_config_manager->toggle_post_processing();
             return "Post processing ".($active ? "activated" : "deactivated").".";
-        }, "Settings", "Post-processing of text (especially for equations)");
+        }, "Settings", "Toggle post-processing of text (especially for equations)");
 
         // The command /auditing toggles the response auditing feature
         $command_manager->add_command(array("/auditing"), function($command, $_) use ($user_config_manager) {

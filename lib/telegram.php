@@ -150,10 +150,9 @@ class Telegram {
 
         // If a message is still longer than $max_length characters, split it into multiple messages via hard cuts
         $new_messages = array();
-        foreach ($messages as $message) {
-            if (strlen($message) > $max_length) {
-
-                $message_parts = str_split($message, $max_length-1);
+        foreach ($messages as $mes) {
+            if (strlen($mes) > $max_length) {
+                $message_parts = str_split($mes, $max_length-1);
                 foreach ($message_parts as $message_part) {
                     $new_messages[] = $message_part;
                 }

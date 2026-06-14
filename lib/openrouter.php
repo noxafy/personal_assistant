@@ -12,7 +12,7 @@ class OpenRouter {
 
     /**
      * Create a new OpenRouter instance.
-     * 
+     *
      * @param UserConfigManager $user The user to use for the requests.
      * @param bool $DEBUG Whether to log debug messages.
      */
@@ -23,7 +23,7 @@ class OpenRouter {
 
     /**
      * Send a request to the OpenRouter API to create a chat completion.
-     * 
+     *
      * @param object|array $data The data to send to the OpenRouter API.
      * @return object|string The response from OpenRouter or an error message (starts with "Error: ").
      */
@@ -36,12 +36,12 @@ class OpenRouter {
             $month = date("ym");
             $this->user->increment("OpenRouter_".$month."_".$model."_prompt_tokens", $response->usage->prompt_tokens);
             $this->user->increment("OpenRouter_".$month."_".$model."_completion_tokens", $response->usage->completion_tokens);
-            Log::debug(array(
-                "interface" => "OpenRouter",
-                "endpoint" => "message",
-                "data" => $data,
-                "response" => $response,
-            ));
+            // Log::debug(array(
+            //     "interface" => "OpenRouter",
+            //     "endpoint" => "message",
+            //     "data" => $data,
+            //     "response" => $response,
+            // ));
             return $response->choices[0]->message;
         }
         return $response;
@@ -49,7 +49,7 @@ class OpenRouter {
 
     /**
      * Send a request to the OpenRouter API.
-     * 
+     *
      * @param string $endpoint The endpoint to send the request to.
      * @param object|array $data The data to send.
      * @param string $field_name (optional) The name of the field with the file content.
